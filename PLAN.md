@@ -30,14 +30,14 @@ Done when: app opens, Vue strip on top, example.com below, resizing works.
 
 Goal: usable single-workspace browser.
 
-- [ ] `TabManager` class in main: create / close / activate / navigate; tab = `{id, view, url, title, favicon, isLoading, canGoBack, canGoForward}`
-- [ ] Wire per-tab events: `did-navigate`, `did-navigate-in-page`, `page-title-updated`, `page-favicon-updated`, `did-start-loading`, `did-stop-loading`
-- [ ] `setWindowOpenHandler` → new tab in your strip, never a popup window
-- [ ] Tab bar UI (Vue): favicons, titles, close buttons, active state
-- [ ] URL bar: navigate on Enter, smart handling (URL vs search query → default to a search engine), show current URL on navigation
-- [ ] Back / forward / reload buttons
-- [ ] Shortcuts via `Menu` accelerators: Ctrl+T, Ctrl+W, Ctrl+L (focus URL bar), Ctrl+Tab / Ctrl+Shift+Tab, Ctrl+R
-- [ ] Basic error page (load failure → friendly local page)
+- [x] `TabManager` class in main: create / close / activate / navigate; tab = `{id, view, url, title, favicon, isLoading, canGoBack, canGoForward}`
+- [x] Wire per-tab events: `did-navigate`, `did-navigate-in-page`, `page-title-updated`, `page-favicon-updated`, `did-start-loading`, `did-stop-loading`
+- [x] `setWindowOpenHandler` → new tab in your strip, never a popup window
+- [x] Tab bar UI (Vue): favicons, titles, close buttons, active state
+- [x] URL bar: navigate on Enter, smart handling (URL vs search query → default to a search engine), show current URL on navigation
+- [x] Back / forward / reload buttons
+- [x] Shortcuts via `Menu` accelerators: Ctrl+T, Ctrl+W, Ctrl+L (focus URL bar), Ctrl+Tab / Ctrl+Shift+Tab, Ctrl+R
+- [x] Basic error page (load failure → friendly local page)
 
 Done when: you can daily-drive it for casual browsing without swearing.
 
