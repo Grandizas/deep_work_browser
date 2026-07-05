@@ -19,10 +19,10 @@ Goal: empty browser skeleton running.
 - [x] Strip scaffold demo code from `src/main`, `src/preload`, `src/renderer`
 - [x] `BaseWindow` + chrome `WebContentsView` (top ~88px) + one tab `WebContentsView`
 - [x] Resize handler keeping bounds in sync
-- [ ] Preload: `contextBridge` exposing exactly two things: `send(cmd, payload)` and `onState(callback)`
-- [ ] Security defaults: chrome view `contextIsolation: true, nodeIntegration: false`; tab views additionally `sandbox: true`, no preload
-- [ ] IPC sender validation in main (reject commands not from the chrome view's frame)
-- [ ] Pinia store in renderer that mirrors a `BrowserState` object pushed from main
+- [x] Preload: `contextBridge` exposing exactly two things: `send(cmd, payload)` and `onState(callback)`
+- [x] Security defaults: chrome view `contextIsolation: true, nodeIntegration: false`; tab views additionally `sandbox: true`, no preload
+- [x] IPC sender validation in main (reject commands not from the chrome view's frame)
+- [x] Pinia store in renderer that mirrors a `BrowserState` object pushed from main
 
 Done when: app opens, Vue strip on top, example.com below, resizing works.
 

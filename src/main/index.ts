@@ -1,7 +1,8 @@
-import { app, BaseWindow, WebContentsView } from 'electron'
+import { app, BaseWindow, WebContentsView, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
 
 // Height of the chrome UI strip (tab bar + URL bar) along the top of the window.
 const CHROME_HEIGHT = 88
@@ -15,17 +16,20 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {})
   })
 
-  // Chrome UI: the Vue renderer strip pinned to the top of the window.
+  // Chrome UI: the Vue renderer strip pinned to the top of the window. It talks
+  // to main through the preload bridge, so it gets context isolation and no node.
   const chromeView = new WebContentsView({
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: false
     }
   })
   mainWindow.contentView.addChildView(chromeView)
 
-  // Tab: a single web page rendered below the chrome strip.
+  // Tab: a single web page rendered below the chrome strip. Untrusted content,
+  // so it is fully sandboxed with no preload — it can never reach the IPC bridge.
   const tabView = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
@@ -34,6 +38,50 @@ function createWindow(): void {
     }
   })
   mainWindow.contentView.addChildView(tabView)
+
+  // --- State plumbing: main owns the truth, the chrome renderer mirrors it. ---
+
+  // Build the authoritative state from the current tab.
+  const currentState = (): BrowserState => {
+    const wc = tabView.webContents
+    return {
+      activeTab: {
+        url: wc.getURL(),
+        title: wc.getTitle(),
+        isLoading: wc.isLoading()
+      }
+    }
+  }
+
+  // Push the latest state to the chrome renderer's Pinia store.
+  const pushState = (): void => {
+    if (chromeView.webContents.isDestroyed()) return
+    chromeView.webContents.send(IPC.stateUpdate, currentState())
+  }
+
+  // Reflect the tab's navigation/loading changes into the mirrored state.
+  const tab = tabView.webContents
+  tab.on('did-navigate', pushState)
+  tab.on('did-navigate-in-page', pushState)
+  tab.on('page-title-updated', pushState)
+  tab.on('did-start-loading', pushState)
+  tab.on('did-stop-loading', pushState)
+
+  // Commands flow the other way. Reject anything not sent by our chrome view —
+  // a sandboxed tab page must never be able to drive the browser.
+  ipcMain.on(IPC.command, (event, message: CommandMessage) => {
+    if (event.sender !== chromeView.webContents) return
+    if (!message || typeof message.cmd !== 'string') return
+
+    switch (message.cmd) {
+      case 'ui:ready':
+        // Renderer mounted and subscribed — send it the initial snapshot.
+        pushState()
+        break
+      default:
+        console.warn('[main] unknown command:', message.cmd)
+    }
+  })
 
   // Keep the chrome strip and tab view sized to the window's content area.
   const layoutViews = (): void => {
