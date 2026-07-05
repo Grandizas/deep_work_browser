@@ -9,6 +9,11 @@ import { installAppMenu, type MenuActions } from './menu'
 // Height of the chrome UI strip (tab bar + toolbar) along the top of the window.
 const CHROME_HEIGHT = 88
 
+// Persistent session partition for tab content. The `persist:` prefix means
+// cookies, localStorage, and logins are written to disk and survive restart.
+// Phase 3 replaces this single partition with one per workspace.
+const TAB_PARTITION = 'persist:default'
+
 // The menu is global; it acts on whichever window is currently active. With a
 // single window this is just that window's actions.
 let activeActions: MenuActions | null = null
@@ -50,7 +55,7 @@ function createWindow(): void {
     chromeView.webContents.send(IPC.stateUpdate, state)
   }
 
-  const tabs = new TabManager(mainWindow, pushState, contentRegion())
+  const tabs = new TabManager(mainWindow, pushState, contentRegion(), TAB_PARTITION)
 
   const focusUrlBar = (): void => {
     focusUrlBarSeq++
@@ -141,7 +146,6 @@ function createWindow(): void {
   } else {
     chromeView.webContents.loadFile(join(__dirname, '../renderer/index.html'))
   }
-
   // Open the first tab.
   tabs.create('https://example.com')
 }

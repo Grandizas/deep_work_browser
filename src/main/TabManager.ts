@@ -27,7 +27,11 @@ export class TabManager {
   constructor(
     private readonly window: BaseWindow,
     private readonly onChange: () => void,
-    private bounds: Rectangle
+    private bounds: Rectangle,
+    // Session partition every tab in this manager loads into. A `persist:` name
+    // stores cookies/localStorage/logins on disk so they survive restart. Phase 3
+    // gives each workspace its own partition; for now all tabs share one.
+    private readonly partition: string
   ) {}
 
   private get active(): Tab | undefined {
@@ -37,7 +41,12 @@ export class TabManager {
   /** Create a tab, load `url`, and make it active. Returns the new tab id. */
   create(url = 'about:blank'): string {
     const view = new WebContentsView({
-      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+      webPreferences: {
+        partition: this.partition,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
     })
     const tab: Tab = { id: nextId(), view, favicon: null, errorUrl: null }
     this.tabs.push(tab)

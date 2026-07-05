@@ -45,7 +45,7 @@ Done when: you can daily-drive it for casual browsing without swearing.
 
 Goal: it remembers things across restarts.
 
-- [ ] `persist:` session partition so logins survive restart
+- [x] `persist:` session partition so logins survive restart
 - [ ] `electron-store` setup: window bounds, last open tabs
 - [ ] SQLite setup (`better-sqlite3`): `history` table, log every navigation
 - [ ] Downloads: `session.on('will-download')` → minimal download list in chrome UI
