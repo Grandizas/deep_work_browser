@@ -16,8 +16,8 @@ Core philosophy: the browser reduces decisions. Every phase must ship something 
 
 Goal: empty browser skeleton running.
 
-- [ ] Strip scaffold demo code from `src/main`, `src/preload`, `src/renderer`
-- [ ] `BaseWindow` + chrome `WebContentsView` (top ~88px) + one tab `WebContentsView`
+- [x] Strip scaffold demo code from `src/main`, `src/preload`, `src/renderer`
+- [x] `BaseWindow` + chrome `WebContentsView` (top ~88px) + one tab `WebContentsView`
 - [ ] Resize handler keeping bounds in sync
 - [ ] Preload: `contextBridge` exposing exactly two things: `send(cmd, payload)` and `onState(callback)`
 - [ ] Security defaults: chrome view `contextIsolation: true, nodeIntegration: false`; tab views additionally `sandbox: true`, no preload
