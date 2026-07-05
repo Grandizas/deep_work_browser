@@ -5,21 +5,33 @@ const store = useBrowserStore()
 </script>
 
 <template>
-  <div class="tabbar">
+  <div class="tabbar" role="tablist" aria-label="Tabs">
     <div
       v-for="tab in store.tabs"
       :key="tab.id"
       class="tab"
       :class="{ active: tab.id === store.activeTabId }"
+      role="tab"
+      tabindex="0"
+      :aria-selected="tab.id === store.activeTabId"
       :title="tab.title || tab.url"
       @click="store.activateTab(tab.id)"
+      @keydown.enter="store.activateTab(tab.id)"
+      @keydown.space.prevent="store.activateTab(tab.id)"
     >
       <img v-if="tab.favicon" class="favicon" :src="tab.favicon" alt="" />
       <span v-else class="favicon placeholder" />
       <span class="label">{{ tab.title || tab.url || 'New Tab' }}</span>
-      <button class="close" title="Close tab" @click.stop="store.closeTab(tab.id)">×</button>
+      <button
+        class="close"
+        aria-label="Close tab"
+        title="Close tab"
+        @click.stop="store.closeTab(tab.id)"
+      >
+        ×
+      </button>
     </div>
-    <button class="newtab" title="New tab" @click="store.newTab()">+</button>
+    <button class="newtab" aria-label="New tab" title="New tab" @click="store.newTab()">+</button>
   </div>
 </template>
 
@@ -58,6 +70,10 @@ const store = useBrowserStore()
 .tab.active {
   background: var(--color-background);
   color: var(--color-text);
+}
+.tab:focus-visible {
+  outline: 2px solid var(--ev-c-gray-1);
+  outline-offset: -2px;
 }
 
 .favicon {

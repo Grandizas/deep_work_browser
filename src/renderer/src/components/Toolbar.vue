@@ -52,6 +52,7 @@ function onEnter(): void {
   <div class="toolbar">
     <button
       class="nav"
+      aria-label="Back"
       title="Back"
       :disabled="!store.activeTab?.canGoBack"
       @click="store.back()"
@@ -60,13 +61,14 @@ function onEnter(): void {
     </button>
     <button
       class="nav"
+      aria-label="Forward"
       title="Forward"
       :disabled="!store.activeTab?.canGoForward"
       @click="store.forward()"
     >
       ›
     </button>
-    <button class="nav" title="Reload" @click="store.reload()">⟳</button>
+    <button class="nav" aria-label="Reload" title="Reload" @click="store.reload()">⟳</button>
     <input
       ref="urlInput"
       v-model="draft"
