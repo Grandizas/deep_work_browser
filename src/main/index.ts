@@ -44,6 +44,7 @@ function createWindow(): void {
   // Build the authoritative state from the current tab.
   const currentState = (): BrowserState => {
     const wc = tabView.webContents
+    if (wc.isDestroyed()) return { activeTab: null }
     return {
       activeTab: {
         url: wc.getURL(),
@@ -69,7 +70,7 @@ function createWindow(): void {
 
   // Commands flow the other way. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
-  ipcMain.on(IPC.command, (event, message: CommandMessage) => {
+  const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
     if (event.sender !== chromeView.webContents) return
     if (!message || typeof message.cmd !== 'string') return
 
@@ -81,7 +82,8 @@ function createWindow(): void {
       default:
         console.warn('[main] unknown command:', message.cmd)
     }
-  })
+  }
+  ipcMain.on(IPC.command, onCommand)
 
   // Keep the chrome strip and tab view sized to the window's content area.
   const layoutViews = (): void => {
@@ -92,6 +94,15 @@ function createWindow(): void {
 
   layoutViews()
   mainWindow.on('resize', layoutViews)
+
+  // Tear down per-window resources. BaseWindow does not dispose child
+  // WebContentsView renderers, and ipcMain listeners accumulate across
+  // window re-creations (e.g. macOS activate) — clean up both here.
+  mainWindow.on('closed', () => {
+    ipcMain.removeListener(IPC.command, onCommand)
+    if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
+    if (!tabView.webContents.isDestroyed()) tabView.webContents.close()
+  })
 
   chromeView.webContents.once('did-finish-load', () => {
     mainWindow.show()
