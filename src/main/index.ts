@@ -5,6 +5,16 @@ import icon from '../../resources/icon.png?asset'
 import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
 import { TabManager } from './TabManager'
 import { installAppMenu, type MenuActions } from './menu'
+import { settings } from './settings'
+
+/** Run `fn` after `ms` of quiet, resetting the timer on each call. */
+function debounce(fn: () => void, ms: number): () => void {
+  let timer: NodeJS.Timeout | undefined
+  return () => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(fn, ms)
+  }
+}
 
 // Height of the chrome UI strip (tab bar + toolbar) along the top of the window.
 const CHROME_HEIGHT = 88
@@ -19,13 +29,17 @@ const TAB_PARTITION = 'persist:default'
 let activeActions: MenuActions | null = null
 
 function createWindow(): void {
+  const bounds = settings.getWindowBounds()
   const mainWindow = new BaseWindow({
-    width: 1200,
-    height: 800,
+    width: bounds.width,
+    height: bounds.height,
+    // Only restore position if we have one saved; otherwise let the OS center it.
+    ...(bounds.x !== undefined && bounds.y !== undefined ? { x: bounds.x, y: bounds.y } : {}),
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {})
   })
+  if (settings.getWindowMaximized()) mainWindow.maximize()
 
   // Chrome UI: the Vue renderer strip pinned to the top of the window. It talks
   // to main through the preload bridge, so it gets context isolation and no node.
@@ -55,7 +69,41 @@ function createWindow(): void {
     chromeView.webContents.send(IPC.stateUpdate, state)
   }
 
-  const tabs = new TabManager(mainWindow, pushState, contentRegion(), TAB_PARTITION)
+  // Every tab change both refreshes the renderer and (debounced) persists the
+  // open-tab list so it can be restored next launch.
+  const tabs = new TabManager(
+    mainWindow,
+    () => {
+      pushState()
+      schedulePersistTabs()
+    },
+    contentRegion(),
+    TAB_PARTITION
+  )
+
+  const persistTabs = (): void => {
+    const state = tabs.getState()
+    const urls = state.tabs.map((t) => t.url)
+    const activeIndex = Math.max(
+      0,
+      state.tabs.findIndex((t) => t.id === state.activeTabId)
+    )
+    settings.setOpenTabs({ urls, activeIndex })
+  }
+  const schedulePersistTabs = debounce(persistTabs, 800)
+
+  // Persist window size/position, but only the un-maximized ("normal") bounds so
+  // a restore returns to a usable size. The maximized flag is recorded separately.
+  const persistWindow = (): void => {
+    if (mainWindow.isDestroyed()) return
+    if (mainWindow.isMaximized()) {
+      settings.setWindow(settings.getWindowBounds(), true)
+    } else {
+      const b = mainWindow.getBounds()
+      settings.setWindow({ width: b.width, height: b.height, x: b.x, y: b.y }, false)
+    }
+  }
+  const schedulePersistWindow = debounce(persistWindow, 500)
 
   const focusUrlBar = (): void => {
     focusUrlBarSeq++
@@ -77,6 +125,10 @@ function createWindow(): void {
   }
   layoutViews()
   mainWindow.on('resize', layoutViews)
+  mainWindow.on('resize', schedulePersistWindow)
+  mainWindow.on('move', schedulePersistWindow)
+  mainWindow.on('maximize', persistWindow)
+  mainWindow.on('unmaximize', persistWindow)
 
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
@@ -126,6 +178,13 @@ function createWindow(): void {
     reload: () => tabs.reload()
   }
 
+  // Flush persisted state while the window and tabs are still alive ('close'
+  // fires before 'closed', which tears everything down).
+  mainWindow.on('close', () => {
+    persistWindow()
+    persistTabs()
+  })
+
   // Tear down per-window resources: BaseWindow doesn't dispose child views, and
   // ipcMain listeners accumulate across window re-creations (macOS activate).
   mainWindow.on('closed', () => {
@@ -146,8 +205,15 @@ function createWindow(): void {
   } else {
     chromeView.webContents.loadFile(join(__dirname, '../renderer/index.html'))
   }
-  // Open the first tab.
-  tabs.create('https://example.com')
+  // Restore last session's tabs, or open a default first tab.
+  const savedTabs = settings.getOpenTabs()
+  if (savedTabs.urls.length > 0) {
+    const ids = savedTabs.urls.map((url) => tabs.create(url))
+    const target = ids[savedTabs.activeIndex] ?? ids[0]
+    if (target) tabs.activate(target)
+  } else {
+    tabs.create('https://example.com')
+  }
 }
 
 // This method will be called when Electron has finished
