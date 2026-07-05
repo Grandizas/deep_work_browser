@@ -1,11 +1,17 @@
-import { app, BaseWindow, WebContentsView, ipcMain } from 'electron'
+import { app, BaseWindow, WebContentsView, ipcMain, type Rectangle } from 'electron'
 import { join } from 'path'
 import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
+import { TabManager } from './TabManager'
+import { installAppMenu, type MenuActions } from './menu'
 
-// Height of the chrome UI strip (tab bar + URL bar) along the top of the window.
+// Height of the chrome UI strip (tab bar + toolbar) along the top of the window.
 const CHROME_HEIGHT = 88
+
+// The menu is global; it acts on whichever window is currently active. With a
+// single window this is just that window's actions.
+let activeActions: MenuActions | null = null
 
 function createWindow(): void {
   const mainWindow = new BaseWindow({
@@ -28,56 +34,76 @@ function createWindow(): void {
   })
   mainWindow.contentView.addChildView(chromeView)
 
-  // Tab: a single web page rendered below the chrome strip. Untrusted content,
-  // so it is fully sandboxed with no preload — it can never reach the IPC bridge.
-  const tabView = new WebContentsView({
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  })
-  mainWindow.contentView.addChildView(tabView)
-
-  // --- State plumbing: main owns the truth, the chrome renderer mirrors it. ---
-
-  // Build the authoritative state from the current tab.
-  const currentState = (): BrowserState => {
-    const wc = tabView.webContents
-    if (wc.isDestroyed()) return { activeTab: null }
-    return {
-      activeTab: {
-        url: wc.getURL(),
-        title: wc.getTitle(),
-        isLoading: wc.isLoading()
-      }
-    }
+  // Region tabs occupy: everything below the chrome strip.
+  const contentRegion = (): Rectangle => {
+    const { width, height } = mainWindow.getContentBounds()
+    return { x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT }
   }
 
-  // Push the latest state to the chrome renderer's Pinia store.
+  // Bumped whenever main asks the renderer to focus the address bar.
+  let focusUrlBarSeq = 0
+
+  // Push the authoritative state to the chrome renderer's Pinia store.
   const pushState = (): void => {
     if (chromeView.webContents.isDestroyed()) return
-    chromeView.webContents.send(IPC.stateUpdate, currentState())
+    const state: BrowserState = { ...tabs.getState(), focusUrlBarSeq }
+    chromeView.webContents.send(IPC.stateUpdate, state)
   }
 
-  // Reflect the tab's navigation/loading changes into the mirrored state.
-  const tab = tabView.webContents
-  tab.on('did-navigate', pushState)
-  tab.on('did-navigate-in-page', pushState)
-  tab.on('page-title-updated', pushState)
-  tab.on('did-start-loading', pushState)
-  tab.on('did-stop-loading', pushState)
+  const tabs = new TabManager(mainWindow, pushState, contentRegion())
 
-  // Commands flow the other way. Reject anything not sent by our chrome view —
+  const focusUrlBar = (): void => {
+    focusUrlBarSeq++
+    chromeView.webContents.focus()
+    pushState()
+  }
+
+  // User-initiated new tab: open blank and drop the cursor in the address bar.
+  const newTab = (): void => {
+    tabs.create()
+    focusUrlBar()
+  }
+
+  // Keep the chrome strip and the active tab sized to the window.
+  const layoutViews = (): void => {
+    const { width } = mainWindow.getContentBounds()
+    chromeView.setBounds({ x: 0, y: 0, width, height: CHROME_HEIGHT })
+    tabs.layout(contentRegion())
+  }
+  layoutViews()
+  mainWindow.on('resize', layoutViews)
+
+  // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
     if (event.sender !== chromeView.webContents) return
     if (!message || typeof message.cmd !== 'string') return
+    const payload = (message.payload ?? {}) as { id?: string; url?: string }
 
     switch (message.cmd) {
       case 'ui:ready':
-        // Renderer mounted and subscribed — send it the initial snapshot.
         pushState()
+        break
+      case 'tab:new':
+        newTab()
+        break
+      case 'tab:close':
+        if (typeof payload.id === 'string') tabs.close(payload.id)
+        break
+      case 'tab:activate':
+        if (typeof payload.id === 'string') tabs.activate(payload.id)
+        break
+      case 'tab:navigate':
+        if (typeof payload.url === 'string') tabs.navigate(payload.url)
+        break
+      case 'tab:back':
+        tabs.back()
+        break
+      case 'tab:forward':
+        tabs.forward()
+        break
+      case 'tab:reload':
+        tabs.reload()
         break
       default:
         console.warn('[main] unknown command:', message.cmd)
@@ -85,23 +111,23 @@ function createWindow(): void {
   }
   ipcMain.on(IPC.command, onCommand)
 
-  // Keep the chrome strip and tab view sized to the window's content area.
-  const layoutViews = (): void => {
-    const { width, height } = mainWindow.getContentBounds()
-    chromeView.setBounds({ x: 0, y: 0, width, height: CHROME_HEIGHT })
-    tabView.setBounds({ x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT })
+  // Route the global menu's accelerators at this window while it's alive.
+  activeActions = {
+    newTab,
+    closeTab: () => tabs.closeActive(),
+    focusUrlBar,
+    nextTab: () => tabs.activateAdjacent(1),
+    prevTab: () => tabs.activateAdjacent(-1),
+    reload: () => tabs.reload()
   }
 
-  layoutViews()
-  mainWindow.on('resize', layoutViews)
-
-  // Tear down per-window resources. BaseWindow does not dispose child
-  // WebContentsView renderers, and ipcMain listeners accumulate across
-  // window re-creations (e.g. macOS activate) — clean up both here.
+  // Tear down per-window resources: BaseWindow doesn't dispose child views, and
+  // ipcMain listeners accumulate across window re-creations (macOS activate).
   mainWindow.on('closed', () => {
     ipcMain.removeListener(IPC.command, onCommand)
+    tabs.destroy()
     if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
-    if (!tabView.webContents.isDestroyed()) tabView.webContents.close()
+    if (activeActions?.newTab === newTab) activeActions = null
   })
 
   chromeView.webContents.once('did-finish-load', () => {
@@ -116,7 +142,8 @@ function createWindow(): void {
     chromeView.webContents.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  tabView.webContents.loadURL('https://example.com')
+  // Open the first tab.
+  tabs.create('https://example.com')
 }
 
 // This method will be called when Electron has finished
@@ -125,6 +152,8 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+
+  installAppMenu(() => activeActions)
 
   createWindow()
 
