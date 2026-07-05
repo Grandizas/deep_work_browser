@@ -6,6 +6,7 @@ import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
 import { TabManager } from './TabManager'
 import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
+import { initHistory, logVisit, closeHistory } from './history'
 
 /** Run `fn` after `ms` of quiet, resetting the timer on each call. */
 function debounce(fn: () => void, ms: number): () => void {
@@ -78,7 +79,9 @@ function createWindow(): void {
       schedulePersistTabs()
     },
     contentRegion(),
-    TAB_PARTITION
+    TAB_PARTITION,
+    // Log every navigation to history. workspaceId is null until Phase 3.
+    (info) => logVisit(info.url, info.title, null)
   )
 
   const persistTabs = (): void => {
@@ -223,6 +226,7 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
+  initHistory()
   installAppMenu(() => activeActions)
 
   createWindow()
@@ -241,6 +245,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('will-quit', () => {
+  closeHistory()
 })
 
 // In this file you can include the rest of your app's specific main process

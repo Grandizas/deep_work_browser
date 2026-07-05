@@ -31,7 +31,9 @@ export class TabManager {
     // Session partition every tab in this manager loads into. A `persist:` name
     // stores cookies/localStorage/logins on disk so they survive restart. Phase 3
     // gives each workspace its own partition; for now all tabs share one.
-    private readonly partition: string
+    private readonly partition: string,
+    // Called on each top-level navigation so the caller can log history.
+    private readonly onNavigate: (info: { url: string; title: string }) => void
   ) {}
 
   private get active(): Tab | undefined {
@@ -63,7 +65,10 @@ export class TabManager {
 
     wc.on('did-start-loading', changed)
     wc.on('did-stop-loading', changed)
-    wc.on('did-navigate', changed)
+    wc.on('did-navigate', () => {
+      changed()
+      this.onNavigate({ url: wc.getURL(), title: wc.getTitle() })
+    })
     wc.on('did-navigate-in-page', changed)
     wc.on('page-title-updated', changed)
     wc.on('page-favicon-updated', (_e, favicons) => {
