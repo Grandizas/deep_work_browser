@@ -12,15 +12,18 @@ export const useBrowserStore = defineStore('browser', {
   state: (): BrowserState => ({
     tabs: [],
     activeTabId: null,
+    downloads: [],
     focusUrlBarSeq: 0
   }),
   getters: {
-    activeTab: (state) => state.tabs.find((t) => t.id === state.activeTabId) ?? null
+    activeTab: (state) => state.tabs.find((t) => t.id === state.activeTabId) ?? null,
+    activeDownloads: (state) => state.downloads.filter((d) => d.state === 'progressing').length
   },
   actions: {
     apply(next: BrowserState): void {
       this.tabs = next.tabs
       this.activeTabId = next.activeTabId
+      this.downloads = next.downloads
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -43,6 +46,15 @@ export const useBrowserStore = defineStore('browser', {
     },
     reload(): void {
       send('tab:reload')
+    },
+    openDownload(id: string): void {
+      send('download:open', { id })
+    },
+    cancelDownload(id: string): void {
+      send('download:cancel', { id })
+    },
+    clearDownloads(): void {
+      send('downloads:clear')
     }
   }
 })

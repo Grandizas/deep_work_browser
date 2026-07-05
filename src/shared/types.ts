@@ -13,6 +13,17 @@ export interface TabState {
   canGoForward: boolean
 }
 
+/** A download's mirrored progress/state. */
+export interface DownloadState {
+  id: string
+  filename: string
+  url: string
+  receivedBytes: number
+  totalBytes: number
+  state: 'progressing' | 'paused' | 'completed' | 'cancelled' | 'interrupted'
+  savePath: string
+}
+
 /**
  * The authoritative browser state owned by the main process. The renderer never
  * mutates this — it only reflects whatever main last pushed.
@@ -20,6 +31,7 @@ export interface TabState {
 export interface BrowserState {
   tabs: TabState[]
   activeTabId: string | null
+  downloads: DownloadState[]
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -38,6 +50,9 @@ export type Command =
   | 'tab:back'
   | 'tab:forward'
   | 'tab:reload'
+  | 'download:open'
+  | 'download:cancel'
+  | 'downloads:clear'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

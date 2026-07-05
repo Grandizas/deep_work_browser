@@ -7,6 +7,7 @@ import { TabManager } from './TabManager'
 import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
 import { initHistory, logVisit, closeHistory } from './history'
+import { DownloadManager } from './DownloadManager'
 
 /** Run `fn` after `ms` of quiet, resetting the timer on each call. */
 function debounce(fn: () => void, ms: number): () => void {
@@ -17,8 +18,10 @@ function debounce(fn: () => void, ms: number): () => void {
   }
 }
 
-// Height of the chrome UI strip (tab bar + toolbar) along the top of the window.
-const CHROME_HEIGHT = 88
+// Height of the chrome UI strip (tab bar + toolbar). A download shelf adds a row
+// below it while downloads exist, so the total chrome height is dynamic.
+const BASE_CHROME_HEIGHT = 88
+const SHELF_HEIGHT = 48
 
 // Persistent session partition for tab content. The `persist:` prefix means
 // cookies, localStorage, and logins are written to disk and survive restart.
@@ -54,10 +57,23 @@ function createWindow(): void {
   })
   mainWindow.contentView.addChildView(chromeView)
 
+  // Downloads for this window's tab session, mirrored into the pushed state.
+  // A change re-pushes state and re-lays out (the shelf grows/shrinks chrome).
+  const downloads = new DownloadManager(TAB_PARTITION, () => {
+    pushState()
+    layoutViews()
+  })
+  downloads.attach()
+
+  // Chrome height grows by the shelf row while there are downloads to show.
+  const chromeHeight = (): number =>
+    BASE_CHROME_HEIGHT + (downloads.getState().length > 0 ? SHELF_HEIGHT : 0)
+
   // Region tabs occupy: everything below the chrome strip.
   const contentRegion = (): Rectangle => {
     const { width, height } = mainWindow.getContentBounds()
-    return { x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT }
+    const top = chromeHeight()
+    return { x: 0, y: top, width, height: height - top }
   }
 
   // Bumped whenever main asks the renderer to focus the address bar.
@@ -66,7 +82,11 @@ function createWindow(): void {
   // Push the authoritative state to the chrome renderer's Pinia store.
   const pushState = (): void => {
     if (chromeView.webContents.isDestroyed()) return
-    const state: BrowserState = { ...tabs.getState(), focusUrlBarSeq }
+    const state: BrowserState = {
+      ...tabs.getState(),
+      downloads: downloads.getState(),
+      focusUrlBarSeq
+    }
     chromeView.webContents.send(IPC.stateUpdate, state)
   }
 
@@ -123,7 +143,7 @@ function createWindow(): void {
   // Keep the chrome strip and the active tab sized to the window.
   const layoutViews = (): void => {
     const { width } = mainWindow.getContentBounds()
-    chromeView.setBounds({ x: 0, y: 0, width, height: CHROME_HEIGHT })
+    chromeView.setBounds({ x: 0, y: 0, width, height: chromeHeight() })
     tabs.layout(contentRegion())
   }
   layoutViews()
@@ -165,6 +185,15 @@ function createWindow(): void {
       case 'tab:reload':
         tabs.reload()
         break
+      case 'download:open':
+        if (typeof payload.id === 'string') downloads.open(payload.id)
+        break
+      case 'download:cancel':
+        if (typeof payload.id === 'string') downloads.cancel(payload.id)
+        break
+      case 'downloads:clear':
+        downloads.clearFinished()
+        break
       default:
         console.warn('[main] unknown command:', message.cmd)
     }
@@ -192,6 +221,7 @@ function createWindow(): void {
   // ipcMain listeners accumulate across window re-creations (macOS activate).
   mainWindow.on('closed', () => {
     ipcMain.removeListener(IPC.command, onCommand)
+    downloads.detach()
     tabs.destroy()
     if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
     if (activeActions?.newTab === newTab) activeActions = null
