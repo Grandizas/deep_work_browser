@@ -35,10 +35,15 @@ function createWindow(): void {
   })
   mainWindow.contentView.addChildView(tabView)
 
-  // Initial layout. Live resizing is wired up in the next step.
-  const { width, height } = mainWindow.getContentBounds()
-  chromeView.setBounds({ x: 0, y: 0, width, height: CHROME_HEIGHT })
-  tabView.setBounds({ x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT })
+  // Keep the chrome strip and tab view sized to the window's content area.
+  const layoutViews = (): void => {
+    const { width, height } = mainWindow.getContentBounds()
+    chromeView.setBounds({ x: 0, y: 0, width, height: CHROME_HEIGHT })
+    tabView.setBounds({ x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT })
+  }
+
+  layoutViews()
+  mainWindow.on('resize', layoutViews)
 
   chromeView.webContents.once('did-finish-load', () => {
     mainWindow.show()
