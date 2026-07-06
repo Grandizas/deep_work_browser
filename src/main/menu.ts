@@ -16,12 +16,10 @@ export interface MenuActions {
  * resolves the target window lazily so the menu can be built once up front.
  */
 export function installAppMenu(getActions: () => MenuActions | null): void {
-  const run =
-    (fn: (a: MenuActions) => void) =>
-    (): void => {
-      const actions = getActions()
-      if (actions) fn(actions)
-    }
+  const run = (fn: (a: MenuActions) => void) => (): void => {
+    const actions = getActions()
+    if (actions) fn(actions)
+  }
 
   const template: MenuItemConstructorOptions[] = [
     {
@@ -37,7 +35,11 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
       label: 'View',
       submenu: [
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: run((a) => a.reload()) },
-        { label: 'Focus Address Bar', accelerator: 'CmdOrCtrl+L', click: run((a) => a.focusUrlBar()) },
+        {
+          label: 'Focus Address Bar',
+          accelerator: 'CmdOrCtrl+L',
+          click: run((a) => a.focusUrlBar())
+        },
         { type: 'separator' },
         { label: 'Next Tab', accelerator: 'Control+Tab', click: run((a) => a.nextTab()) },
         { label: 'Previous Tab', accelerator: 'Control+Shift+Tab', click: run((a) => a.prevTab()) },

@@ -1,4 +1,12 @@
-import { WebContentsView, type BaseWindow, type Rectangle } from 'electron'
+import {
+  WebContentsView,
+  Menu,
+  clipboard,
+  type BaseWindow,
+  type Rectangle,
+  type WebContents,
+  type MenuItemConstructorOptions
+} from 'electron'
 import { toNavigationUrl } from '../shared/url'
 import type { BrowserState, TabState } from '../shared/types'
 
@@ -27,7 +35,13 @@ export class TabManager {
   constructor(
     private readonly window: BaseWindow,
     private readonly onChange: () => void,
-    private bounds: Rectangle
+    private bounds: Rectangle,
+    // Session partition every tab in this manager loads into. A `persist:` name
+    // stores cookies/localStorage/logins on disk so they survive restart. Phase 3
+    // gives each workspace its own partition; for now all tabs share one.
+    private readonly partition: string,
+    // Called on each top-level navigation so the caller can log history.
+    private readonly onNavigate: (info: { url: string; title: string }) => void
   ) {}
 
   private get active(): Tab | undefined {
@@ -37,7 +51,12 @@ export class TabManager {
   /** Create a tab, load `url`, and make it active. Returns the new tab id. */
   create(url = 'about:blank'): string {
     const view = new WebContentsView({
-      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+      webPreferences: {
+        partition: this.partition,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
     })
     const tab: Tab = { id: nextId(), view, favicon: null, errorUrl: null }
     this.tabs.push(tab)
@@ -54,7 +73,10 @@ export class TabManager {
 
     wc.on('did-start-loading', changed)
     wc.on('did-stop-loading', changed)
-    wc.on('did-navigate', changed)
+    wc.on('did-navigate', () => {
+      changed()
+      this.onNavigate({ url: wc.getURL(), title: wc.getTitle() })
+    })
     wc.on('did-navigate-in-page', changed)
     wc.on('page-title-updated', changed)
     wc.on('page-favicon-updated', (_e, favicons) => {
@@ -73,6 +95,51 @@ export class TabManager {
       this.create(url)
       return { action: 'deny' }
     })
+
+    // Right-click menu. Native popup, so it isn't clipped by the chrome view.
+    wc.on('context-menu', (_e, params) => this.showContextMenu(wc, params))
+  }
+
+  private showContextMenu(wc: WebContents, params: Electron.ContextMenuParams): void {
+    const items: MenuItemConstructorOptions[] = []
+
+    if (params.linkURL) {
+      items.push(
+        { label: 'Open Link in New Tab', click: () => this.create(params.linkURL) },
+        { label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) },
+        { type: 'separator' }
+      )
+    }
+    if (params.mediaType === 'image' && params.srcURL) {
+      items.push(
+        { label: 'Copy Image Address', click: () => clipboard.writeText(params.srcURL) },
+        { type: 'separator' }
+      )
+    }
+    if (params.isEditable) {
+      items.push(
+        { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut },
+        { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy },
+        { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
+        { type: 'separator' }
+      )
+    } else if (params.selectionText) {
+      items.push({ label: 'Copy', role: 'copy' }, { type: 'separator' })
+    }
+
+    items.push(
+      { label: 'Back', enabled: wc.navigationHistory.canGoBack(), click: () => this.back() },
+      {
+        label: 'Forward',
+        enabled: wc.navigationHistory.canGoForward(),
+        click: () => this.forward()
+      },
+      { label: 'Reload', click: () => this.reload() },
+      { type: 'separator' },
+      { label: 'Inspect Element', click: () => wc.inspectElement(params.x, params.y) }
+    )
+
+    Menu.buildFromTemplate(items).popup()
   }
 
   activate(id: string): void {
