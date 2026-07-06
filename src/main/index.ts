@@ -113,6 +113,9 @@ function createWindow(): void {
   )
 
   const persistTabs = (): void => {
+    // A debounced call can fire after the window closed and tabs were destroyed;
+    // don't overwrite the good state that 'close' already flushed with an empty one.
+    if (mainWindow.isDestroyed()) return
     const state = tabs.getState()
     const urls = state.tabs.map((t) => t.url)
     const activeIndex = Math.max(

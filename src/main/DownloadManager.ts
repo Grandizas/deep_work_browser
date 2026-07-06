@@ -41,7 +41,7 @@ export class DownloadManager {
   }
 
   private track(item: DownloadItem): void {
-    const savePath = uniquePath(join(app.getPath('downloads'), item.getFilename()))
+    const savePath = reserveUniquePath(join(app.getPath('downloads'), item.getFilename()))
     item.setSavePath(savePath)
 
     const id = `dl-${++seq}`
@@ -68,6 +68,7 @@ export class DownloadManager {
     })
     item.once('done', (_e, doneState) => {
       // doneState is 'completed' | 'cancelled' | 'interrupted'
+      releasePath(savePath)
       entry.state.state = doneState
       entry.state.receivedBytes = item.getReceivedBytes()
       entry.state.totalBytes = item.getTotalBytes()
@@ -79,7 +80,9 @@ export class DownloadManager {
 
   cancel(id: string): void {
     const entry = this.entries.find((e) => e.state.id === id)
-    if (entry && entry.state.state === 'progressing') entry.item.cancel()
+    if (entry && (entry.state.state === 'progressing' || entry.state.state === 'paused')) {
+      entry.item.cancel()
+    }
   }
 
   open(id: string): void {
@@ -101,17 +104,31 @@ export class DownloadManager {
   }
 }
 
-/** Append " (n)" before the extension until the path is free, like Chrome. */
-function uniquePath(path: string): string {
-  if (!existsSync(path)) return path
-  const dir = path.slice(0, path.length - basename(path).length)
-  const ext = extname(path)
-  const stem = basename(path, ext)
-  let n = 1
-  let candidate: string
-  do {
-    candidate = join(dir, `${stem} (${n})${ext}`)
-    n++
-  } while (existsSync(candidate))
+// Paths already handed to in-flight downloads. `will-download` fires before the
+// file exists on disk, so existsSync alone can't stop two same-named concurrent
+// downloads from picking the same path — we reserve here and release on 'done'.
+// Stored lower-cased since the target filesystem (Windows) is case-insensitive.
+const reservedPaths = new Set<string>()
+
+const isTaken = (path: string): boolean => existsSync(path) || reservedPaths.has(path.toLowerCase())
+
+/** Append " (n)" before the extension until the path is free, then reserve it. */
+function reserveUniquePath(path: string): string {
+  let candidate = path
+  if (isTaken(candidate)) {
+    const dir = path.slice(0, path.length - basename(path).length)
+    const ext = extname(path)
+    const stem = basename(path, ext)
+    let n = 1
+    do {
+      candidate = join(dir, `${stem} (${n})${ext}`)
+      n++
+    } while (isTaken(candidate))
+  }
+  reservedPaths.add(candidate.toLowerCase())
   return candidate
+}
+
+function releasePath(path: string): void {
+  reservedPaths.delete(path.toLowerCase())
 }
