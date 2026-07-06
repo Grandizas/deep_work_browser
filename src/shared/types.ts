@@ -13,6 +13,23 @@ export interface TabState {
   canGoForward: boolean
 }
 
+/**
+ * A workspace: an isolated browsing context with its own session partition
+ * (cookies/logins), tabs, and pinned sites. Persisted in electron-store.
+ */
+export interface Workspace {
+  id: string
+  name: string
+  emoji: string
+  themeColor: string
+  /** Electron session partition, e.g. `persist:ws-coding` — isolates logins. */
+  partition: string
+  /** Tab ids currently belonging to this workspace. */
+  tabIds: string[]
+  /** Pinned site URLs shown in the workspace's bookmarks row. */
+  pinnedSites: string[]
+}
+
 /** A pending permission request awaiting the user's allow/deny via chrome UI. */
 export interface PermissionRequest {
   id: string

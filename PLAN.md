@@ -58,7 +58,7 @@ Done when: restart restores your tabs and logins.
 
 Goal: switching workspaces feels like entering another office.
 
-- [ ] `Workspace` model: `{id, name, emoji, themeColor, partition, tabIds, pinnedSites}` in electron-store
+- [x] `Workspace` model: `{id, name, emoji, themeColor, partition, tabIds, pinnedSites}` in electron-store
 - [ ] Each workspace's tabs created with its own `persist:ws-<id>` partition
 - [ ] Workspace switcher UI (sidebar or top-left dropdown) with the six defaults: Coding, Learning, Writing, Design, Finance, Personal
 - [ ] Switching = hide current workspace's views, show target's (keep views alive; cap total live tabs later if memory becomes an issue)

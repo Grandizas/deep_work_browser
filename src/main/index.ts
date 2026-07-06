@@ -9,6 +9,7 @@ import { settings } from './settings'
 import { initHistory, logVisit, closeHistory } from './history'
 import { DownloadManager } from './DownloadManager'
 import { PermissionManager } from './PermissionManager'
+import { workspaces } from './workspaces'
 
 /** Run `fn` after `ms` of quiet, resetting the timer on each call. */
 function debounce(fn: () => void, ms: number): () => void {
@@ -274,6 +275,7 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
   initHistory()
+  workspaces.init()
   installAppMenu(() => activeActions)
 
   createWindow()
