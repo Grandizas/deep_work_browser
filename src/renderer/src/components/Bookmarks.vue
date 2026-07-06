@@ -19,8 +19,12 @@ function label(url: string): string {
       v-for="url in store.pinnedSites"
       :key="url"
       class="pin"
+      role="button"
+      tabindex="0"
       :title="url"
       @click="store.navigate(url)"
+      @keydown.enter="store.navigate(url)"
+      @keydown.space.prevent="store.navigate(url)"
     >
       <span class="dot" />
       <span class="label">{{ label(url) }}</span>
@@ -61,6 +65,11 @@ function label(url: string): string {
 }
 .pin:hover {
   background: var(--color-background-mute);
+  color: var(--color-text);
+}
+.pin:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
   color: var(--color-text);
 }
 

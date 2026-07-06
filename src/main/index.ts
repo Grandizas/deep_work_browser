@@ -107,11 +107,12 @@ function createWindow(): void {
     chromeView.webContents.send(IPC.stateUpdate, state)
   }
 
-  const persistTabs = (): void => {
-    // A debounced call can fire after the window closed and views were destroyed;
-    // don't overwrite the good state that 'close' already flushed with an empty one.
+  // Persist a specific workspace's tabs to its own key — never assume the change
+  // came from the active workspace (a background workspace can emit changes too,
+  // e.g. a page calling window.open).
+  const persistTabsFor = (id: string): void => {
     if (mainWindow.isDestroyed()) return
-    const view = activeView()
+    const view = workspaceViews.get(id)
     if (!view) return
     const state = view.tabs.getState()
     const urls = state.tabs.map((t) => t.url)
@@ -119,16 +120,7 @@ function createWindow(): void {
       0,
       state.tabs.findIndex((t) => t.id === state.activeTabId)
     )
-    settings.setOpenTabs(activeId, { urls, activeIndex })
-  }
-  const schedulePersistTabs = debounce(persistTabs, 800)
-
-  // Any change from any workspace's managers: refresh the renderer, re-lay out
-  // (shelf/prompt rows resize chrome), and persist the active workspace's tabs.
-  const handleChange = (): void => {
-    pushState()
-    layoutViews()
-    schedulePersistTabs()
+    settings.setOpenTabs(id, { urls, activeIndex })
   }
 
   // Restore a workspace's persisted tabs, or open a default first tab.
@@ -151,7 +143,17 @@ function createWindow(): void {
       // Tag each workspace's navigations with its own id in history.
       const onNavigate = (info: { url: string; title: string }): void =>
         logVisit(info.url, info.title, ws.id)
-      view = new WorkspaceView(mainWindow, ws, handleChange, contentRegion(), onNavigate)
+      // Each workspace persists its OWN tabs (debounced). Only the active one
+      // drives the chrome UI, so background changes don't re-render it.
+      const persist = debounce(() => persistTabsFor(id), 800)
+      const onChange = (): void => {
+        if (id === activeId) {
+          pushState()
+          layoutViews()
+        }
+        persist()
+      }
+      view = new WorkspaceView(mainWindow, ws, onChange, contentRegion(), onNavigate)
       workspaceViews.set(id, view)
       restoreTabs(view, id)
     }
@@ -210,7 +212,7 @@ function createWindow(): void {
   // (created and restored on first visit). Both stay alive across the switch.
   const switchWorkspace = (id: string): void => {
     if (id === activeId) return
-    persistTabs()
+    persistTabsFor(activeId)
     activeView()?.hide()
 
     activeId = id
@@ -336,10 +338,11 @@ function createWindow(): void {
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'
-  // fires before 'closed', which tears everything down).
+  // fires before 'closed'). Flush every visited workspace, not just the active
+  // one, so pending debounced saves for background workspaces aren't lost.
   mainWindow.on('close', () => {
     persistWindow()
-    persistTabs()
+    for (const id of workspaceViews.keys()) persistTabsFor(id)
   })
 
   // Tear down per-window resources: BaseWindow doesn't dispose child views, and
