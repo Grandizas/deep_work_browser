@@ -1,4 +1,4 @@
-import { app, BaseWindow, WebContentsView, ipcMain, type Rectangle } from 'electron'
+import { app, BaseWindow, WebContentsView, ipcMain, Menu, type Rectangle } from 'electron'
 import { join } from 'path'
 import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -10,6 +10,7 @@ import { initHistory, logVisit, closeHistory } from './history'
 import { DownloadManager } from './DownloadManager'
 import { PermissionManager } from './PermissionManager'
 import { workspaces } from './workspaces'
+import type { WorkspaceSummary } from '../shared/types'
 
 /** Run `fn` after `ms` of quiet, resetting the timer on each call. */
 function debounce(fn: () => void, ms: number): () => void {
@@ -95,6 +96,8 @@ function createWindow(): void {
       ...tabs.getState(),
       downloads: downloads.getState(),
       permissionRequest: permissions.current(),
+      workspaces: workspaceSummaries(),
+      activeWorkspaceId: workspaces.getActiveId(),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -144,6 +147,32 @@ function createWindow(): void {
   const focusUrlBar = (): void => {
     focusUrlBarSeq++
     chromeView.webContents.focus()
+    pushState()
+  }
+
+  const workspaceSummaries = (): WorkspaceSummary[] =>
+    workspaces.getAll().map(({ id, name, emoji, themeColor }) => ({ id, name, emoji, themeColor }))
+
+  // Native dropdown for the workspace switcher — a native popup isn't clipped by
+  // the tab WebContentsView the way a chrome-view dropdown would be.
+  const showWorkspaceMenu = (): void => {
+    const activeId = workspaces.getActiveId()
+    const menu = Menu.buildFromTemplate(
+      workspaces.getAll().map((w) => ({
+        label: `${w.emoji}  ${w.name}`,
+        type: 'checkbox' as const,
+        checked: w.id === activeId,
+        click: () => switchWorkspace(w.id)
+      }))
+    )
+    menu.popup({ window: mainWindow })
+  }
+
+  const switchWorkspace = (id: string): void => {
+    if (id === workspaces.getActiveId()) return
+    workspaces.setActiveId(id)
+    // Persisting + reflecting the choice now; swapping the live views (hide the
+    // current workspace's tabs, show the target's) is the next checkbox.
     pushState()
   }
 
@@ -211,6 +240,9 @@ function createWindow(): void {
         if (typeof payload.id === 'string' && typeof payload.granted === 'boolean') {
           permissions.resolve(payload.id, payload.granted)
         }
+        break
+      case 'workspace:menu':
+        showWorkspaceMenu()
         break
       default:
         console.warn('[main] unknown command:', message.cmd)

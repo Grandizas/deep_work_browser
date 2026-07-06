@@ -30,6 +30,14 @@ export interface Workspace {
   pinnedSites: string[]
 }
 
+/** The renderer-facing subset of a Workspace, used to render the switcher. */
+export interface WorkspaceSummary {
+  id: string
+  name: string
+  emoji: string
+  themeColor: string
+}
+
 /** A pending permission request awaiting the user's allow/deny via chrome UI. */
 export interface PermissionRequest {
   id: string
@@ -59,6 +67,8 @@ export interface BrowserState {
   downloads: DownloadState[]
   /** The current permission prompt to surface, or null. One at a time. */
   permissionRequest: PermissionRequest | null
+  workspaces: WorkspaceSummary[]
+  activeWorkspaceId: string
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -81,6 +91,7 @@ export type Command =
   | 'download:cancel'
   | 'downloads:clear'
   | 'permission:resolve'
+  | 'workspace:menu'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

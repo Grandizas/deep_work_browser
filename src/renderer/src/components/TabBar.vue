@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useBrowserStore } from '../stores/browser'
+import WorkspaceSwitcher from './WorkspaceSwitcher.vue'
 
 const store = useBrowserStore()
 </script>
 
 <template>
   <div class="tabbar" role="tablist" aria-label="Tabs">
+    <WorkspaceSwitcher />
     <div
       v-for="tab in store.tabs"
       :key="tab.id"
