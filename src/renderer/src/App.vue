@@ -6,6 +6,7 @@ import Toolbar from './components/Toolbar.vue'
 import Bookmarks from './components/Bookmarks.vue'
 import Downloads from './components/Downloads.vue'
 import PermissionPrompt from './components/PermissionPrompt.vue'
+import WorkspacePicker from './components/WorkspacePicker.vue'
 
 const store = useBrowserStore()
 
@@ -25,7 +26,8 @@ onUnmounted(() => unsubscribe?.())
 </script>
 
 <template>
-  <div id="chrome" :style="{ '--accent': accent }">
+  <WorkspacePicker v-if="store.showPicker" />
+  <div v-else id="chrome" :style="{ '--accent': accent }">
     <TabBar />
     <Toolbar />
     <Bookmarks v-if="store.pinnedSites.length" />

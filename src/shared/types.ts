@@ -71,6 +71,8 @@ export interface BrowserState {
   activeWorkspaceId: string
   /** The active workspace's pinned site URLs (its bookmarks row). */
   pinnedSites: string[]
+  /** When true, show the "what are you working on?" picker instead of the browser. */
+  showPicker: boolean
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -94,6 +96,7 @@ export type Command =
   | 'downloads:clear'
   | 'permission:resolve'
   | 'workspace:menu'
+  | 'workspace:start'
   | 'workspace:pin'
   | 'workspace:unpin'
 

@@ -62,6 +62,9 @@ function createWindow(): void {
   let activeId = workspaces.getActiveId()
   const activeView = (): WorkspaceView | undefined => workspaceViews.get(activeId)
 
+  // Start on the workspace picker; no WorkspaceView exists until one is chosen.
+  let showPicker = true
+
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
 
@@ -98,6 +101,7 @@ function createWindow(): void {
       workspaces: workspaceSummaries(),
       activeWorkspaceId: activeId,
       pinnedSites: workspaces.get(activeId)?.pinnedSites ?? [],
+      showPicker,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -190,6 +194,18 @@ function createWindow(): void {
     menu.popup({ window: mainWindow })
   }
 
+  // Enter a workspace from the startup picker: create/show it and drop the
+  // full-window picker down to the normal chrome strip.
+  const startWorkspace = (id: string): void => {
+    activeId = id
+    workspaces.setActiveId(id)
+    showPicker = false
+    ensureView(id)
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+
   // Switch workspaces: flush + hide the current one's views, then show the target
   // (created and restored on first visit). Both stay alive across the switch.
   const switchWorkspace = (id: string): void => {
@@ -228,8 +244,13 @@ function createWindow(): void {
   }
 
   // Keep the chrome strip and the active workspace's tab sized to the window.
+  // During the picker the chrome view fills the whole window (no tabs exist yet).
   const layoutViews = (): void => {
-    const { width } = mainWindow.getContentBounds()
+    const { width, height } = mainWindow.getContentBounds()
+    if (showPicker) {
+      chromeView.setBounds({ x: 0, y: 0, width, height })
+      return
+    }
     chromeView.setBounds({ x: 0, y: 0, width, height: chromeHeight() })
     activeView()?.tabs.layout(contentRegion())
   }
@@ -289,6 +310,9 @@ function createWindow(): void {
       case 'workspace:menu':
         showWorkspaceMenu()
         break
+      case 'workspace:start':
+        if (typeof payload.id === 'string') startWorkspace(payload.id)
+        break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)
         break
@@ -339,10 +363,9 @@ function createWindow(): void {
   } else {
     chromeView.webContents.loadFile(join(__dirname, '../renderer/index.html'))
   }
-  // Bring up the active workspace's view and show it.
-  ensureView(activeId)
+  // Start on the workspace picker (chrome view fills the window). A workspace is
+  // created and shown only once the user picks one via 'workspace:start'.
   layoutViews()
-  activeView()?.show(contentRegion())
   pushState()
 }
 

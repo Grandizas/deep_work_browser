@@ -17,6 +17,7 @@ export const useBrowserStore = defineStore('browser', {
     workspaces: [],
     activeWorkspaceId: '',
     pinnedSites: [],
+    showPicker: true,
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -38,6 +39,7 @@ export const useBrowserStore = defineStore('browser', {
       this.workspaces = next.workspaces
       this.activeWorkspaceId = next.activeWorkspaceId
       this.pinnedSites = next.pinnedSites
+      this.showPicker = next.showPicker
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -75,6 +77,9 @@ export const useBrowserStore = defineStore('browser', {
     },
     openWorkspaceMenu(): void {
       send('workspace:menu')
+    },
+    startWorkspace(id: string): void {
+      send('workspace:start', { id })
     },
     pinSite(url: string): void {
       send('workspace:pin', { url })
