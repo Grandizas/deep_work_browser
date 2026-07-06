@@ -127,10 +127,6 @@ function createWindow(): void {
     schedulePersistTabs()
   }
 
-  // Log every navigation to history. workspaceId tagging comes in a later step.
-  const onNavigate = (info: { url: string; title: string }): void =>
-    logVisit(info.url, info.title, null)
-
   // Restore a workspace's persisted tabs, or open a default first tab.
   const restoreTabs = (view: WorkspaceView, workspaceId: string): void => {
     const saved = settings.getOpenTabs(workspaceId)
@@ -148,6 +144,9 @@ function createWindow(): void {
     let view = workspaceViews.get(id)
     if (!view) {
       const ws = workspaces.get(id) ?? workspaces.getActive()
+      // Tag each workspace's navigations with its own id in history.
+      const onNavigate = (info: { url: string; title: string }): void =>
+        logVisit(info.url, info.title, ws.id)
       view = new WorkspaceView(mainWindow, ws, handleChange, contentRegion(), onNavigate)
       workspaceViews.set(id, view)
       restoreTabs(view, id)

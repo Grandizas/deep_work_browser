@@ -64,7 +64,7 @@ Goal: switching workspaces feels like entering another office.
 - [x] Switching = hide current workspace's views, show target's (keep views alive; cap total live tabs later if memory becomes an issue)
 - [x] Per-workspace theme: accent color / subtle background shift in chrome UI (you have the SCSS chops — keep it to CSS variables driven by workspace)
 - [x] Per-workspace bookmarks (pinned sites row)
-- [ ] History logging tagged with `workspaceId`
+- [x] History logging tagged with `workspaceId`
 - [ ] Startup prompt: "What are you working on today?" → workspace picker as the first screen
 
 Done when: Finance logins don't exist in Personal; each workspace reopens with its own tabs.
