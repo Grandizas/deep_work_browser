@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useBrowserStore } from './stores/browser'
 import TabBar from './components/TabBar.vue'
 import Toolbar from './components/Toolbar.vue'
@@ -7,6 +7,11 @@ import Downloads from './components/Downloads.vue'
 import PermissionPrompt from './components/PermissionPrompt.vue'
 
 const store = useBrowserStore()
+
+// The active workspace's theme colour, exposed as a CSS variable that the whole
+// chrome UI accents off of. Changes reactively when you switch workspaces.
+const accent = computed(() => store.activeWorkspace?.themeColor ?? '#4f8cff')
+
 let unsubscribe: (() => void) | undefined
 
 onMounted(() => {
@@ -19,7 +24,7 @@ onUnmounted(() => unsubscribe?.())
 </script>
 
 <template>
-  <div id="chrome">
+  <div id="chrome" :style="{ '--accent': accent }">
     <TabBar />
     <Toolbar />
     <PermissionPrompt />
@@ -32,7 +37,10 @@ onUnmounted(() => unsubscribe?.())
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--color-background-soft);
-  border-bottom: 1px solid var(--ev-c-gray-3);
+  /* Subtle per-workspace background shift: the chrome strip is faintly tinted
+     with the workspace accent, with a stronger accent hairline at the bottom. */
+  background: color-mix(in srgb, var(--accent) 7%, var(--color-background-soft));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, var(--ev-c-gray-3));
+  transition: background 0.25s ease;
 }
 </style>

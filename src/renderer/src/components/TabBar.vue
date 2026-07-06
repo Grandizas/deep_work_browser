@@ -70,11 +70,11 @@ const store = useBrowserStore()
   background: var(--color-background-mute);
 }
 .tab.active {
-  background: var(--color-background);
+  background: color-mix(in srgb, var(--accent, transparent) 16%, var(--color-background));
   color: var(--color-text);
 }
 .tab:focus-visible {
-  outline: 2px solid var(--ev-c-gray-1);
+  outline: 2px solid var(--accent, var(--ev-c-gray-1));
   outline-offset: -2px;
 }
 

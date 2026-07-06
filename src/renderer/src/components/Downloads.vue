@@ -134,7 +134,7 @@ function statusText(d: DownloadState): string {
 }
 .fill {
   height: 100%;
-  background: #4f8cff;
+  background: var(--accent, #4f8cff);
   transition: width 0.15s linear;
 }
 

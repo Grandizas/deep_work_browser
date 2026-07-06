@@ -27,16 +27,16 @@ const store = useBrowserStore()
   height: 30px;
   margin: 0 6px 3px 2px;
   padding: 0 8px;
-  border: 1px solid var(--ev-c-gray-3);
+  border: 1px solid color-mix(in srgb, var(--accent, transparent) 45%, var(--ev-c-gray-3));
   border-radius: 8px;
-  background: var(--color-background-mute);
+  background: color-mix(in srgb, var(--accent, transparent) 10%, var(--color-background-mute));
   color: var(--color-text);
   font-size: 12px;
   font-weight: 600;
   cursor: default;
 }
 .switcher:hover {
-  background: var(--color-background);
+  background: color-mix(in srgb, var(--accent, transparent) 18%, var(--color-background-mute));
 }
 
 .dot {

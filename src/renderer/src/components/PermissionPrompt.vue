@@ -78,10 +78,10 @@ button {
   background: var(--ev-c-gray-2);
 }
 .allow {
-  background: #4f8cff;
+  background: var(--accent, #4f8cff);
   color: #fff;
 }
 .allow:hover {
-  background: #3a78f0;
+  filter: brightness(1.1);
 }
 </style>

@@ -91,7 +91,8 @@ function onEnter(): void {
   gap: 4px;
   height: 48px;
   padding: 0 10px;
-  background: var(--color-background);
+  /* Transparent so the workspace-tinted chrome background shows through. */
+  background: transparent;
 }
 
 .nav {
@@ -129,7 +130,7 @@ function onEnter(): void {
   outline: none;
 }
 .url:focus {
-  border-color: var(--ev-c-gray-1);
+  border-color: var(--accent, var(--ev-c-gray-1));
   background: var(--color-background-soft);
 }
 </style>
