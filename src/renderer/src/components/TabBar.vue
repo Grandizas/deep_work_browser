@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useBrowserStore } from '../stores/browser'
+import WorkspaceSwitcher from './WorkspaceSwitcher.vue'
 
 const store = useBrowserStore()
 </script>
 
 <template>
   <div class="tabbar" role="tablist" aria-label="Tabs">
+    <WorkspaceSwitcher />
     <div
       v-for="tab in store.tabs"
       :key="tab.id"
@@ -68,11 +70,11 @@ const store = useBrowserStore()
   background: var(--color-background-mute);
 }
 .tab.active {
-  background: var(--color-background);
+  background: color-mix(in srgb, var(--accent, transparent) 16%, var(--color-background));
   color: var(--color-text);
 }
 .tab:focus-visible {
-  outline: 2px solid var(--ev-c-gray-1);
+  outline: 2px solid var(--accent, var(--ev-c-gray-1));
   outline-offset: -2px;
 }
 

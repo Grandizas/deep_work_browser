@@ -15,13 +15,14 @@ export interface OpenTabs {
 interface AppSettings {
   windowBounds: WindowBounds
   windowMaximized: boolean
-  openTabs: OpenTabs
+  // Open tabs are remembered per workspace so each reopens with its own tabs.
+  openTabsByWorkspace: Record<string, OpenTabs>
 }
 
 const defaults: AppSettings = {
   windowBounds: { width: 1200, height: 800 },
   windowMaximized: false,
-  openTabs: { urls: [], activeIndex: 0 }
+  openTabsByWorkspace: {}
 }
 
 // Lazily constructed: electron-store reads the userData path in its constructor,
@@ -40,6 +41,11 @@ export const settings = {
     s().set('windowBounds', bounds)
     s().set('windowMaximized', maximized)
   },
-  getOpenTabs: (): OpenTabs => s().get('openTabs'),
-  setOpenTabs: (tabs: OpenTabs): void => s().set('openTabs', tabs)
+  getOpenTabs: (workspaceId: string): OpenTabs =>
+    s().get('openTabsByWorkspace')[workspaceId] ?? { urls: [], activeIndex: 0 },
+  setOpenTabs: (workspaceId: string, tabs: OpenTabs): void => {
+    const map = s().get('openTabsByWorkspace')
+    map[workspaceId] = tabs
+    s().set('openTabsByWorkspace', map)
+  }
 }

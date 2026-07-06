@@ -29,6 +29,10 @@
   --color-background-mute: var(--ev-c-black-mute);
 
   --color-text: var(--ev-c-text-1);
+
+  /* Workspace accent. Default here; App.vue overrides it on #chrome per the
+     active workspace's themeColor. Declared so tooling can resolve var(--accent). */
+  --accent: #4f8cff;
 }
 
 *,

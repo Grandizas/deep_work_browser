@@ -13,6 +13,31 @@ export interface TabState {
   canGoForward: boolean
 }
 
+/**
+ * A workspace: an isolated browsing context with its own session partition
+ * (cookies/logins), tabs, and pinned sites. Persisted in electron-store.
+ */
+export interface Workspace {
+  id: string
+  name: string
+  emoji: string
+  themeColor: string
+  /** Electron session partition, e.g. `persist:ws-coding` — isolates logins. */
+  partition: string
+  /** Tab ids currently belonging to this workspace. */
+  tabIds: string[]
+  /** Pinned site URLs shown in the workspace's bookmarks row. */
+  pinnedSites: string[]
+}
+
+/** The renderer-facing subset of a Workspace, used to render the switcher. */
+export interface WorkspaceSummary {
+  id: string
+  name: string
+  emoji: string
+  themeColor: string
+}
+
 /** A pending permission request awaiting the user's allow/deny via chrome UI. */
 export interface PermissionRequest {
   id: string
@@ -42,6 +67,12 @@ export interface BrowserState {
   downloads: DownloadState[]
   /** The current permission prompt to surface, or null. One at a time. */
   permissionRequest: PermissionRequest | null
+  workspaces: WorkspaceSummary[]
+  activeWorkspaceId: string
+  /** The active workspace's pinned site URLs (its bookmarks row). */
+  pinnedSites: string[]
+  /** When true, show the "what are you working on?" picker instead of the browser. */
+  showPicker: boolean
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -64,6 +95,10 @@ export type Command =
   | 'download:cancel'
   | 'downloads:clear'
   | 'permission:resolve'
+  | 'workspace:menu'
+  | 'workspace:start'
+  | 'workspace:pin'
+  | 'workspace:unpin'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

@@ -14,11 +14,21 @@ export const useBrowserStore = defineStore('browser', {
     activeTabId: null,
     downloads: [],
     permissionRequest: null,
+    workspaces: [],
+    activeWorkspaceId: '',
+    pinnedSites: [],
+    showPicker: true,
     focusUrlBarSeq: 0
   }),
   getters: {
     activeTab: (state) => state.tabs.find((t) => t.id === state.activeTabId) ?? null,
-    activeDownloads: (state) => state.downloads.filter((d) => d.state === 'progressing').length
+    activeDownloads: (state) => state.downloads.filter((d) => d.state === 'progressing').length,
+    activeWorkspace: (state) =>
+      state.workspaces.find((w) => w.id === state.activeWorkspaceId) ?? null,
+    isActiveTabPinned(state): boolean {
+      const url = state.tabs.find((t) => t.id === state.activeTabId)?.url
+      return url ? state.pinnedSites.includes(url) : false
+    }
   },
   actions: {
     apply(next: BrowserState): void {
@@ -26,6 +36,10 @@ export const useBrowserStore = defineStore('browser', {
       this.activeTabId = next.activeTabId
       this.downloads = next.downloads
       this.permissionRequest = next.permissionRequest
+      this.workspaces = next.workspaces
+      this.activeWorkspaceId = next.activeWorkspaceId
+      this.pinnedSites = next.pinnedSites
+      this.showPicker = next.showPicker
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -60,6 +74,24 @@ export const useBrowserStore = defineStore('browser', {
     },
     resolvePermission(id: string, granted: boolean): void {
       send('permission:resolve', { id, granted })
+    },
+    openWorkspaceMenu(): void {
+      send('workspace:menu')
+    },
+    startWorkspace(id: string): void {
+      send('workspace:start', { id })
+    },
+    pinSite(url: string): void {
+      send('workspace:pin', { url })
+    },
+    unpinSite(url: string): void {
+      send('workspace:unpin', { url })
+    },
+    toggleActiveTabPinned(): void {
+      const url = this.activeTab?.url
+      if (!url) return
+      if (this.isActiveTabPinned) this.unpinSite(url)
+      else this.pinSite(url)
     }
   }
 })

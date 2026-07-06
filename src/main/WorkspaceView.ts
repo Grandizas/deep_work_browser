@@ -1,0 +1,46 @@
+import type { BaseWindow, Rectangle } from 'electron'
+import { TabManager } from './TabManager'
+import { DownloadManager } from './DownloadManager'
+import { PermissionManager } from './PermissionManager'
+import type { Workspace } from '../shared/types'
+
+/**
+ * Everything session-bound for one workspace in one window: its tabs, downloads,
+ * and permission prompts, all running in the workspace's own `persist:ws-<id>`
+ * partition. A window keeps one of these per visited workspace and switches
+ * between them by hiding one and showing another — views stay alive across
+ * switches so returning to a workspace is instant.
+ */
+export class WorkspaceView {
+  readonly tabs: TabManager
+  readonly downloads: DownloadManager
+  readonly permissions: PermissionManager
+
+  constructor(
+    window: BaseWindow,
+    readonly workspace: Workspace,
+    onChange: () => void,
+    initialRegion: Rectangle,
+    onNavigate: (info: { url: string; title: string }) => void
+  ) {
+    this.downloads = new DownloadManager(workspace.partition, onChange)
+    this.permissions = new PermissionManager(workspace.partition, onChange)
+    this.tabs = new TabManager(window, onChange, initialRegion, workspace.partition, onNavigate)
+    this.downloads.attach()
+    this.permissions.attach()
+  }
+
+  hide(): void {
+    this.tabs.hide()
+  }
+
+  show(region: Rectangle): void {
+    this.tabs.show(region)
+  }
+
+  destroy(): void {
+    this.downloads.detach()
+    this.permissions.detach()
+    this.tabs.destroy()
+  }
+}

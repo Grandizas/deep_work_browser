@@ -81,6 +81,15 @@ function onEnter(): void {
       @blur="onBlur"
       @keyup.enter="onEnter"
     />
+    <button
+      class="nav star"
+      :class="{ active: store.isActiveTabPinned }"
+      :aria-label="store.isActiveTabPinned ? 'Unpin site' : 'Pin site'"
+      :title="store.isActiveTabPinned ? 'Unpin from workspace' : 'Pin to workspace'"
+      @click="store.toggleActiveTabPinned()"
+    >
+      {{ store.isActiveTabPinned ? '★' : '☆' }}
+    </button>
   </div>
 </template>
 
@@ -91,7 +100,8 @@ function onEnter(): void {
   gap: 4px;
   height: 48px;
   padding: 0 10px;
-  background: var(--color-background);
+  /* Transparent so the workspace-tinted chrome background shows through. */
+  background: transparent;
 }
 
 .nav {
@@ -115,6 +125,13 @@ function onEnter(): void {
   opacity: 0.3;
 }
 
+.star {
+  font-size: 16px;
+}
+.star.active {
+  color: var(--accent);
+}
+
 .url {
   flex: 1;
   min-width: 0;
@@ -129,7 +146,7 @@ function onEnter(): void {
   outline: none;
 }
 .url:focus {
-  border-color: var(--ev-c-gray-1);
+  border-color: var(--accent, var(--ev-c-gray-1));
   background: var(--color-background-soft);
 }
 </style>

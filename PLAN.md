@@ -58,14 +58,14 @@ Done when: restart restores your tabs and logins.
 
 Goal: switching workspaces feels like entering another office.
 
-- [ ] `Workspace` model: `{id, name, emoji, themeColor, partition, tabIds, pinnedSites}` in electron-store
-- [ ] Each workspace's tabs created with its own `persist:ws-<id>` partition
-- [ ] Workspace switcher UI (sidebar or top-left dropdown) with the six defaults: Coding, Learning, Writing, Design, Finance, Personal
-- [ ] Switching = hide current workspace's views, show target's (keep views alive; cap total live tabs later if memory becomes an issue)
-- [ ] Per-workspace theme: accent color / subtle background shift in chrome UI (you have the SCSS chops — keep it to CSS variables driven by workspace)
-- [ ] Per-workspace bookmarks (pinned sites row)
-- [ ] History logging tagged with `workspaceId`
-- [ ] Startup prompt: "What are you working on today?" → workspace picker as the first screen
+- [x] `Workspace` model: `{id, name, emoji, themeColor, partition, tabIds, pinnedSites}` in electron-store
+- [x] Each workspace's tabs created with its own `persist:ws-<id>` partition
+- [x] Workspace switcher UI (sidebar or top-left dropdown) with the six defaults: Coding, Learning, Writing, Design, Finance, Personal
+- [x] Switching = hide current workspace's views, show target's (keep views alive; cap total live tabs later if memory becomes an issue)
+- [x] Per-workspace theme: accent color / subtle background shift in chrome UI (you have the SCSS chops — keep it to CSS variables driven by workspace)
+- [x] Per-workspace bookmarks (pinned sites row)
+- [x] History logging tagged with `workspaceId`
+- [x] Startup prompt: "What are you working on today?" → workspace picker as the first screen
 
 Done when: Finance logins don't exist in Personal; each workspace reopens with its own tabs.
 
