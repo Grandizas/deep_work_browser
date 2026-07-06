@@ -3,12 +3,10 @@ import { join } from 'path'
 import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
-import { TabManager } from './TabManager'
+import { WorkspaceView } from './WorkspaceView'
 import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
 import { initHistory, logVisit, closeHistory } from './history'
-import { DownloadManager } from './DownloadManager'
-import { PermissionManager } from './PermissionManager'
 import { workspaces } from './workspaces'
 import type { WorkspaceSummary } from '../shared/types'
 
@@ -44,12 +42,6 @@ function createWindow(): void {
   })
   if (settings.getWindowMaximized()) mainWindow.maximize()
 
-  // The window operates on the active workspace; its tabs, downloads, and
-  // permission prompts all run in that workspace's own `persist:ws-<id>` session
-  // partition, so logins/cookies are isolated per workspace.
-  const activeWorkspace = workspaces.getActive()
-  const partition = activeWorkspace.partition
-
   // Chrome UI: the Vue renderer strip pinned to the top of the window. It talks
   // to main through the preload bridge, so it gets context isolation and no node.
   const chromeView = new WebContentsView({
@@ -62,22 +54,27 @@ function createWindow(): void {
   })
   mainWindow.contentView.addChildView(chromeView)
 
-  // Downloads and permission prompts for this window's tab session, mirrored
-  // into pushed state. A change re-pushes and re-lays out (rows grow/shrink chrome).
-  const onExtrasChange = (): void => {
-    pushState()
-    layoutViews()
-  }
-  const downloads = new DownloadManager(partition, onExtrasChange)
-  downloads.attach()
-  const permissions = new PermissionManager(partition, onExtrasChange)
-  permissions.attach()
+  // One live WorkspaceView per visited workspace; switching hides one and shows
+  // another (views stay alive). The active workspace is the one whose tabs,
+  // downloads, and permission prompts drive the chrome UI.
+  const workspaceViews = new Map<string, WorkspaceView>()
+  let activeId = workspaces.getActiveId()
+  const activeView = (): WorkspaceView | undefined => workspaceViews.get(activeId)
 
-  // Chrome height grows by a row for the download shelf and the permission prompt.
-  const chromeHeight = (): number =>
-    BASE_CHROME_HEIGHT +
-    (downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
-    (permissions.current() ? PROMPT_HEIGHT : 0)
+  // Bumped whenever main asks the renderer to focus the address bar.
+  let focusUrlBarSeq = 0
+
+  // Chrome height grows by a row for the active workspace's download shelf and
+  // permission prompt. Tolerant of no active view yet (returns the base height).
+  const chromeHeight = (): number => {
+    const view = activeView()
+    if (!view) return BASE_CHROME_HEIGHT
+    return (
+      BASE_CHROME_HEIGHT +
+      (view.downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
+      (view.permissions.current() ? PROMPT_HEIGHT : 0)
+    )
+  }
 
   // Region tabs occupy: everything below the chrome strip.
   const contentRegion = (): Rectangle => {
@@ -86,50 +83,73 @@ function createWindow(): void {
     return { x: 0, y: top, width, height: height - top }
   }
 
-  // Bumped whenever main asks the renderer to focus the address bar.
-  let focusUrlBarSeq = 0
-
-  // Push the authoritative state to the chrome renderer's Pinia store.
+  // Push the active workspace's authoritative state to the chrome renderer.
   const pushState = (): void => {
     if (chromeView.webContents.isDestroyed()) return
+    const view = activeView()
     const state: BrowserState = {
-      ...tabs.getState(),
-      downloads: downloads.getState(),
-      permissionRequest: permissions.current(),
+      tabs: view ? view.tabs.getState().tabs : [],
+      activeTabId: view ? view.tabs.getState().activeTabId : null,
+      downloads: view ? view.downloads.getState() : [],
+      permissionRequest: view ? view.permissions.current() : null,
       workspaces: workspaceSummaries(),
-      activeWorkspaceId: workspaces.getActiveId(),
+      activeWorkspaceId: activeId,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
   }
 
-  // Every tab change both refreshes the renderer and (debounced) persists the
-  // open-tab list so it can be restored next launch.
-  const tabs = new TabManager(
-    mainWindow,
-    () => {
-      pushState()
-      schedulePersistTabs()
-    },
-    contentRegion(),
-    partition,
-    // Log every navigation to history. workspaceId tagging comes in a later step.
-    (info) => logVisit(info.url, info.title, null)
-  )
-
   const persistTabs = (): void => {
-    // A debounced call can fire after the window closed and tabs were destroyed;
+    // A debounced call can fire after the window closed and views were destroyed;
     // don't overwrite the good state that 'close' already flushed with an empty one.
     if (mainWindow.isDestroyed()) return
-    const state = tabs.getState()
+    const view = activeView()
+    if (!view) return
+    const state = view.tabs.getState()
     const urls = state.tabs.map((t) => t.url)
     const activeIndex = Math.max(
       0,
       state.tabs.findIndex((t) => t.id === state.activeTabId)
     )
-    settings.setOpenTabs({ urls, activeIndex })
+    settings.setOpenTabs(activeId, { urls, activeIndex })
   }
   const schedulePersistTabs = debounce(persistTabs, 800)
+
+  // Any change from any workspace's managers: refresh the renderer, re-lay out
+  // (shelf/prompt rows resize chrome), and persist the active workspace's tabs.
+  const handleChange = (): void => {
+    pushState()
+    layoutViews()
+    schedulePersistTabs()
+  }
+
+  // Log every navigation to history. workspaceId tagging comes in a later step.
+  const onNavigate = (info: { url: string; title: string }): void =>
+    logVisit(info.url, info.title, null)
+
+  // Restore a workspace's persisted tabs, or open a default first tab.
+  const restoreTabs = (view: WorkspaceView, workspaceId: string): void => {
+    const saved = settings.getOpenTabs(workspaceId)
+    if (saved.urls.length > 0) {
+      const ids = saved.urls.map((url) => view.tabs.create(url))
+      const target = ids[saved.activeIndex] ?? ids[0]
+      if (target) view.tabs.activate(target)
+    } else {
+      view.tabs.create('https://example.com')
+    }
+  }
+
+  // Get (or lazily create + restore) the WorkspaceView for a workspace id.
+  const ensureView = (id: string): WorkspaceView => {
+    let view = workspaceViews.get(id)
+    if (!view) {
+      const ws = workspaces.get(id) ?? workspaces.getActive()
+      view = new WorkspaceView(mainWindow, ws, handleChange, contentRegion(), onNavigate)
+      workspaceViews.set(id, view)
+      restoreTabs(view, id)
+    }
+    return view
+  }
 
   // Persist window size/position, but only the un-maximized ("normal") bounds so
   // a restore returns to a usable size. The maximized flag is recorded separately.
@@ -156,7 +176,6 @@ function createWindow(): void {
   // Native dropdown for the workspace switcher — a native popup isn't clipped by
   // the tab WebContentsView the way a chrome-view dropdown would be.
   const showWorkspaceMenu = (): void => {
-    const activeId = workspaces.getActiveId()
     const menu = Menu.buildFromTemplate(
       workspaces.getAll().map((w) => ({
         label: `${w.emoji}  ${w.name}`,
@@ -168,25 +187,32 @@ function createWindow(): void {
     menu.popup({ window: mainWindow })
   }
 
+  // Switch workspaces: flush + hide the current one's views, then show the target
+  // (created and restored on first visit). Both stay alive across the switch.
   const switchWorkspace = (id: string): void => {
-    if (id === workspaces.getActiveId()) return
+    if (id === activeId) return
+    persistTabs()
+    activeView()?.hide()
+
+    activeId = id
     workspaces.setActiveId(id)
-    // Persisting + reflecting the choice now; swapping the live views (hide the
-    // current workspace's tabs, show the target's) is the next checkbox.
+    ensureView(id)
+    layoutViews()
+    activeView()?.show(contentRegion())
     pushState()
   }
 
   // User-initiated new tab: open blank and drop the cursor in the address bar.
   const newTab = (): void => {
-    tabs.create()
+    activeView()?.tabs.create()
     focusUrlBar()
   }
 
-  // Keep the chrome strip and the active tab sized to the window.
+  // Keep the chrome strip and the active workspace's tab sized to the window.
   const layoutViews = (): void => {
     const { width } = mainWindow.getContentBounds()
     chromeView.setBounds({ x: 0, y: 0, width, height: chromeHeight() })
-    tabs.layout(contentRegion())
+    activeView()?.tabs.layout(contentRegion())
   }
   layoutViews()
   mainWindow.on('resize', layoutViews)
@@ -210,35 +236,35 @@ function createWindow(): void {
         newTab()
         break
       case 'tab:close':
-        if (typeof payload.id === 'string') tabs.close(payload.id)
+        if (typeof payload.id === 'string') activeView()?.tabs.close(payload.id)
         break
       case 'tab:activate':
-        if (typeof payload.id === 'string') tabs.activate(payload.id)
+        if (typeof payload.id === 'string') activeView()?.tabs.activate(payload.id)
         break
       case 'tab:navigate':
-        if (typeof payload.url === 'string') tabs.navigate(payload.url)
+        if (typeof payload.url === 'string') activeView()?.tabs.navigate(payload.url)
         break
       case 'tab:back':
-        tabs.back()
+        activeView()?.tabs.back()
         break
       case 'tab:forward':
-        tabs.forward()
+        activeView()?.tabs.forward()
         break
       case 'tab:reload':
-        tabs.reload()
+        activeView()?.tabs.reload()
         break
       case 'download:open':
-        if (typeof payload.id === 'string') downloads.open(payload.id)
+        if (typeof payload.id === 'string') activeView()?.downloads.open(payload.id)
         break
       case 'download:cancel':
-        if (typeof payload.id === 'string') downloads.cancel(payload.id)
+        if (typeof payload.id === 'string') activeView()?.downloads.cancel(payload.id)
         break
       case 'downloads:clear':
-        downloads.clearFinished()
+        activeView()?.downloads.clearFinished()
         break
       case 'permission:resolve':
         if (typeof payload.id === 'string' && typeof payload.granted === 'boolean') {
-          permissions.resolve(payload.id, payload.granted)
+          activeView()?.permissions.resolve(payload.id, payload.granted)
         }
         break
       case 'workspace:menu':
@@ -253,11 +279,11 @@ function createWindow(): void {
   // Route the global menu's accelerators at this window while it's alive.
   activeActions = {
     newTab,
-    closeTab: () => tabs.closeActive(),
+    closeTab: () => activeView()?.tabs.closeActive(),
     focusUrlBar,
-    nextTab: () => tabs.activateAdjacent(1),
-    prevTab: () => tabs.activateAdjacent(-1),
-    reload: () => tabs.reload()
+    nextTab: () => activeView()?.tabs.activateAdjacent(1),
+    prevTab: () => activeView()?.tabs.activateAdjacent(-1),
+    reload: () => activeView()?.tabs.reload()
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'
@@ -271,9 +297,8 @@ function createWindow(): void {
   // ipcMain listeners accumulate across window re-creations (macOS activate).
   mainWindow.on('closed', () => {
     ipcMain.removeListener(IPC.command, onCommand)
-    downloads.detach()
-    permissions.detach()
-    tabs.destroy()
+    for (const view of workspaceViews.values()) view.destroy()
+    workspaceViews.clear()
     if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
     if (activeActions?.newTab === newTab) activeActions = null
   })
@@ -289,15 +314,11 @@ function createWindow(): void {
   } else {
     chromeView.webContents.loadFile(join(__dirname, '../renderer/index.html'))
   }
-  // Restore last session's tabs, or open a default first tab.
-  const savedTabs = settings.getOpenTabs()
-  if (savedTabs.urls.length > 0) {
-    const ids = savedTabs.urls.map((url) => tabs.create(url))
-    const target = ids[savedTabs.activeIndex] ?? ids[0]
-    if (target) tabs.activate(target)
-  } else {
-    tabs.create('https://example.com')
-  }
+  // Bring up the active workspace's view and show it.
+  ensureView(activeId)
+  layoutViews()
+  activeView()?.show(contentRegion())
+  pushState()
 }
 
 // This method will be called when Electron has finished

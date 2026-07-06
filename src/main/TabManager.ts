@@ -237,6 +237,19 @@ export class TabManager {
     this.active?.view.setBounds(bounds)
   }
 
+  /** Hide all of this workspace's tabs (on switching away). Views stay alive. */
+  hide(): void {
+    for (const tab of this.tabs) tab.view.setVisible(false)
+  }
+
+  /** Show this workspace's active tab in `bounds` (on switching to it). */
+  show(bounds: Rectangle): void {
+    this.bounds = bounds
+    for (const tab of this.tabs) tab.view.setVisible(tab.id === this.activeId)
+    this.active?.view.setBounds(bounds)
+    this.active?.view.webContents.focus()
+  }
+
   getState(): Pick<BrowserState, 'tabs' | 'activeTabId'> {
     return {
       activeTabId: this.activeId,
