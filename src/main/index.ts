@@ -8,6 +8,7 @@ import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
 import { initHistory, logVisit, closeHistory } from './history'
 import { DownloadManager } from './DownloadManager'
+import { PermissionManager } from './PermissionManager'
 
 /** Run `fn` after `ms` of quiet, resetting the timer on each call. */
 function debounce(fn: () => void, ms: number): () => void {
@@ -18,10 +19,11 @@ function debounce(fn: () => void, ms: number): () => void {
   }
 }
 
-// Height of the chrome UI strip (tab bar + toolbar). A download shelf adds a row
-// below it while downloads exist, so the total chrome height is dynamic.
+// Height of the chrome UI strip (tab bar + toolbar). A download shelf and a
+// permission prompt each add a row below it, so total chrome height is dynamic.
 const BASE_CHROME_HEIGHT = 88
 const SHELF_HEIGHT = 48
+const PROMPT_HEIGHT = 48
 
 // Persistent session partition for tab content. The `persist:` prefix means
 // cookies, localStorage, and logins are written to disk and survive restart.
@@ -57,17 +59,22 @@ function createWindow(): void {
   })
   mainWindow.contentView.addChildView(chromeView)
 
-  // Downloads for this window's tab session, mirrored into the pushed state.
-  // A change re-pushes state and re-lays out (the shelf grows/shrinks chrome).
-  const downloads = new DownloadManager(TAB_PARTITION, () => {
+  // Downloads and permission prompts for this window's tab session, mirrored
+  // into pushed state. A change re-pushes and re-lays out (rows grow/shrink chrome).
+  const onExtrasChange = (): void => {
     pushState()
     layoutViews()
-  })
+  }
+  const downloads = new DownloadManager(TAB_PARTITION, onExtrasChange)
   downloads.attach()
+  const permissions = new PermissionManager(TAB_PARTITION, onExtrasChange)
+  permissions.attach()
 
-  // Chrome height grows by the shelf row while there are downloads to show.
+  // Chrome height grows by a row for the download shelf and the permission prompt.
   const chromeHeight = (): number =>
-    BASE_CHROME_HEIGHT + (downloads.getState().length > 0 ? SHELF_HEIGHT : 0)
+    BASE_CHROME_HEIGHT +
+    (downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
+    (permissions.current() ? PROMPT_HEIGHT : 0)
 
   // Region tabs occupy: everything below the chrome strip.
   const contentRegion = (): Rectangle => {
@@ -85,6 +92,7 @@ function createWindow(): void {
     const state: BrowserState = {
       ...tabs.getState(),
       downloads: downloads.getState(),
+      permissionRequest: permissions.current(),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -158,7 +166,7 @@ function createWindow(): void {
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
     if (event.sender !== chromeView.webContents) return
     if (!message || typeof message.cmd !== 'string') return
-    const payload = (message.payload ?? {}) as { id?: string; url?: string }
+    const payload = (message.payload ?? {}) as { id?: string; url?: string; granted?: boolean }
 
     switch (message.cmd) {
       case 'ui:ready':
@@ -194,6 +202,11 @@ function createWindow(): void {
       case 'downloads:clear':
         downloads.clearFinished()
         break
+      case 'permission:resolve':
+        if (typeof payload.id === 'string' && typeof payload.granted === 'boolean') {
+          permissions.resolve(payload.id, payload.granted)
+        }
+        break
       default:
         console.warn('[main] unknown command:', message.cmd)
     }
@@ -222,6 +235,7 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     ipcMain.removeListener(IPC.command, onCommand)
     downloads.detach()
+    permissions.detach()
     tabs.destroy()
     if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
     if (activeActions?.newTab === newTab) activeActions = null

@@ -4,6 +4,7 @@ import { useBrowserStore } from './stores/browser'
 import TabBar from './components/TabBar.vue'
 import Toolbar from './components/Toolbar.vue'
 import Downloads from './components/Downloads.vue'
+import PermissionPrompt from './components/PermissionPrompt.vue'
 
 const store = useBrowserStore()
 let unsubscribe: (() => void) | undefined
@@ -21,6 +22,7 @@ onUnmounted(() => unsubscribe?.())
   <div id="chrome">
     <TabBar />
     <Toolbar />
+    <PermissionPrompt />
     <Downloads v-if="store.downloads.length" />
   </div>
 </template>

@@ -13,6 +13,7 @@ export const useBrowserStore = defineStore('browser', {
     tabs: [],
     activeTabId: null,
     downloads: [],
+    permissionRequest: null,
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -24,6 +25,7 @@ export const useBrowserStore = defineStore('browser', {
       this.tabs = next.tabs
       this.activeTabId = next.activeTabId
       this.downloads = next.downloads
+      this.permissionRequest = next.permissionRequest
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -55,6 +57,9 @@ export const useBrowserStore = defineStore('browser', {
     },
     clearDownloads(): void {
       send('downloads:clear')
+    },
+    resolvePermission(id: string, granted: boolean): void {
+      send('permission:resolve', { id, granted })
     }
   }
 })

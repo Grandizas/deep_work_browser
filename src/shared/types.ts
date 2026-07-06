@@ -13,6 +13,14 @@ export interface TabState {
   canGoForward: boolean
 }
 
+/** A pending permission request awaiting the user's allow/deny via chrome UI. */
+export interface PermissionRequest {
+  id: string
+  origin: string
+  /** Human-facing capability names, e.g. ['microphone'], ['camera', 'microphone'], ['notifications']. */
+  types: string[]
+}
+
 /** A download's mirrored progress/state. */
 export interface DownloadState {
   id: string
@@ -32,6 +40,8 @@ export interface BrowserState {
   tabs: TabState[]
   activeTabId: string | null
   downloads: DownloadState[]
+  /** The current permission prompt to surface, or null. One at a time. */
+  permissionRequest: PermissionRequest | null
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -53,6 +63,7 @@ export type Command =
   | 'download:open'
   | 'download:cancel'
   | 'downloads:clear'
+  | 'permission:resolve'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {
