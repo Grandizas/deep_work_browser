@@ -50,7 +50,7 @@ Goal: it remembers things across restarts.
 - [x] SQLite setup (`better-sqlite3`): `history` table, log every navigation
 - [x] Downloads: `session.on('will-download')` → minimal download list in chrome UI
 - [x] Permission handler: `setPermissionRequestHandler` — deny by default, prompt through chrome UI for mic/camera/notifications
-- [ ] Context menu on tab pages (`context-menu` package or manual): open link in new tab, copy link, inspect
+- [x] Context menu on tab pages (`context-menu` package or manual): open link in new tab, copy link, inspect
 
 Done when: restart restores your tabs and logins.
 
