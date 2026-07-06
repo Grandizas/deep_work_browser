@@ -16,13 +16,18 @@ export const useBrowserStore = defineStore('browser', {
     permissionRequest: null,
     workspaces: [],
     activeWorkspaceId: '',
+    pinnedSites: [],
     focusUrlBarSeq: 0
   }),
   getters: {
     activeTab: (state) => state.tabs.find((t) => t.id === state.activeTabId) ?? null,
     activeDownloads: (state) => state.downloads.filter((d) => d.state === 'progressing').length,
     activeWorkspace: (state) =>
-      state.workspaces.find((w) => w.id === state.activeWorkspaceId) ?? null
+      state.workspaces.find((w) => w.id === state.activeWorkspaceId) ?? null,
+    isActiveTabPinned(state): boolean {
+      const url = state.tabs.find((t) => t.id === state.activeTabId)?.url
+      return url ? state.pinnedSites.includes(url) : false
+    }
   },
   actions: {
     apply(next: BrowserState): void {
@@ -32,6 +37,7 @@ export const useBrowserStore = defineStore('browser', {
       this.permissionRequest = next.permissionRequest
       this.workspaces = next.workspaces
       this.activeWorkspaceId = next.activeWorkspaceId
+      this.pinnedSites = next.pinnedSites
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -69,6 +75,18 @@ export const useBrowserStore = defineStore('browser', {
     },
     openWorkspaceMenu(): void {
       send('workspace:menu')
+    },
+    pinSite(url: string): void {
+      send('workspace:pin', { url })
+    },
+    unpinSite(url: string): void {
+      send('workspace:unpin', { url })
+    },
+    toggleActiveTabPinned(): void {
+      const url = this.activeTab?.url
+      if (!url) return
+      if (this.isActiveTabPinned) this.unpinSite(url)
+      else this.pinSite(url)
     }
   }
 })

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { useBrowserStore } from './stores/browser'
 import TabBar from './components/TabBar.vue'
 import Toolbar from './components/Toolbar.vue'
+import Bookmarks from './components/Bookmarks.vue'
 import Downloads from './components/Downloads.vue'
 import PermissionPrompt from './components/PermissionPrompt.vue'
 
@@ -27,6 +28,7 @@ onUnmounted(() => unsubscribe?.())
   <div id="chrome" :style="{ '--accent': accent }">
     <TabBar />
     <Toolbar />
+    <Bookmarks v-if="store.pinnedSites.length" />
     <PermissionPrompt />
     <Downloads v-if="store.downloads.length" />
   </div>

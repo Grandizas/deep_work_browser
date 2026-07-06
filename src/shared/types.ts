@@ -69,6 +69,8 @@ export interface BrowserState {
   permissionRequest: PermissionRequest | null
   workspaces: WorkspaceSummary[]
   activeWorkspaceId: string
+  /** The active workspace's pinned site URLs (its bookmarks row). */
+  pinnedSites: string[]
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -92,6 +94,8 @@ export type Command =
   | 'downloads:clear'
   | 'permission:resolve'
   | 'workspace:menu'
+  | 'workspace:pin'
+  | 'workspace:unpin'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

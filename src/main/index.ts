@@ -24,6 +24,7 @@ function debounce(fn: () => void, ms: number): () => void {
 const BASE_CHROME_HEIGHT = 88
 const SHELF_HEIGHT = 48
 const PROMPT_HEIGHT = 48
+const BOOKMARKS_HEIGHT = 36
 
 // The menu is global; it acts on whichever window is currently active. With a
 // single window this is just that window's actions.
@@ -69,8 +70,10 @@ function createWindow(): void {
   const chromeHeight = (): number => {
     const view = activeView()
     if (!view) return BASE_CHROME_HEIGHT
+    const hasPins = (workspaces.get(activeId)?.pinnedSites.length ?? 0) > 0
     return (
       BASE_CHROME_HEIGHT +
+      (hasPins ? BOOKMARKS_HEIGHT : 0) +
       (view.downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
       (view.permissions.current() ? PROMPT_HEIGHT : 0)
     )
@@ -94,6 +97,7 @@ function createWindow(): void {
       permissionRequest: view ? view.permissions.current() : null,
       workspaces: workspaceSummaries(),
       activeWorkspaceId: activeId,
+      pinnedSites: workspaces.get(activeId)?.pinnedSites ?? [],
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -202,6 +206,22 @@ function createWindow(): void {
     pushState()
   }
 
+  // Pin / unpin a site in the active workspace's bookmarks row.
+  const pinSite = (url: string): void => {
+    const ws = workspaces.get(activeId)
+    if (!ws || !url || url === 'about:blank' || ws.pinnedSites.includes(url)) return
+    workspaces.update(activeId, { pinnedSites: [...ws.pinnedSites, url] })
+    layoutViews()
+    pushState()
+  }
+  const unpinSite = (url: string): void => {
+    const ws = workspaces.get(activeId)
+    if (!ws) return
+    workspaces.update(activeId, { pinnedSites: ws.pinnedSites.filter((u) => u !== url) })
+    layoutViews()
+    pushState()
+  }
+
   // User-initiated new tab: open blank and drop the cursor in the address bar.
   const newTab = (): void => {
     activeView()?.tabs.create()
@@ -269,6 +289,12 @@ function createWindow(): void {
         break
       case 'workspace:menu':
         showWorkspaceMenu()
+        break
+      case 'workspace:pin':
+        if (typeof payload.url === 'string') pinSite(payload.url)
+        break
+      case 'workspace:unpin':
+        if (typeof payload.url === 'string') unpinSite(payload.url)
         break
       default:
         console.warn('[main] unknown command:', message.cmd)

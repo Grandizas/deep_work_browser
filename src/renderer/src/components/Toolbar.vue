@@ -81,6 +81,15 @@ function onEnter(): void {
       @blur="onBlur"
       @keyup.enter="onEnter"
     />
+    <button
+      class="nav star"
+      :class="{ active: store.isActiveTabPinned }"
+      :aria-label="store.isActiveTabPinned ? 'Unpin site' : 'Pin site'"
+      :title="store.isActiveTabPinned ? 'Unpin from workspace' : 'Pin to workspace'"
+      @click="store.toggleActiveTabPinned()"
+    >
+      {{ store.isActiveTabPinned ? '★' : '☆' }}
+    </button>
   </div>
 </template>
 
@@ -114,6 +123,13 @@ function onEnter(): void {
 }
 .nav:disabled {
   opacity: 0.3;
+}
+
+.star {
+  font-size: 16px;
+}
+.star.active {
+  color: var(--accent);
 }
 
 .url {
