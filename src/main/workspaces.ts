@@ -27,6 +27,7 @@ const DEFAULT_WORKSPACES: Workspace[] = [
 
 interface WorkspacesSchema {
   workspaces: Workspace[]
+  activeWorkspaceId: string
 }
 
 // Lazily constructed after app ready (electron-store reads the userData path in
@@ -37,6 +38,7 @@ function s(): Store<WorkspacesSchema> {
     store = new Store<WorkspacesSchema>({ name: 'workspaces' })
     // Seed the defaults on first run; never clobber the user's later edits.
     if (!store.has('workspaces')) store.set('workspaces', DEFAULT_WORKSPACES)
+    if (!store.has('activeWorkspaceId')) store.set('activeWorkspaceId', DEFAULT_WORKSPACES[0].id)
   }
   return store
 }
@@ -56,6 +58,16 @@ export const workspaces = {
         .get('workspaces')
         .find((w) => w.id === id) ?? null
     )
+  },
+  getActiveId(): string {
+    return s().get('activeWorkspaceId')
+  },
+  setActiveId(id: string): void {
+    s().set('activeWorkspaceId', id)
+  },
+  /** The active workspace, falling back to the first if the id is stale. */
+  getActive(): Workspace {
+    return this.get(this.getActiveId()) ?? this.getAll()[0]
   },
   saveAll(list: Workspace[]): void {
     s().set('workspaces', list)

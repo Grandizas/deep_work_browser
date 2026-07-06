@@ -26,11 +26,6 @@ const BASE_CHROME_HEIGHT = 88
 const SHELF_HEIGHT = 48
 const PROMPT_HEIGHT = 48
 
-// Persistent session partition for tab content. The `persist:` prefix means
-// cookies, localStorage, and logins are written to disk and survive restart.
-// Phase 3 replaces this single partition with one per workspace.
-const TAB_PARTITION = 'persist:default'
-
 // The menu is global; it acts on whichever window is currently active. With a
 // single window this is just that window's actions.
 let activeActions: MenuActions | null = null
@@ -47,6 +42,12 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {})
   })
   if (settings.getWindowMaximized()) mainWindow.maximize()
+
+  // The window operates on the active workspace; its tabs, downloads, and
+  // permission prompts all run in that workspace's own `persist:ws-<id>` session
+  // partition, so logins/cookies are isolated per workspace.
+  const activeWorkspace = workspaces.getActive()
+  const partition = activeWorkspace.partition
 
   // Chrome UI: the Vue renderer strip pinned to the top of the window. It talks
   // to main through the preload bridge, so it gets context isolation and no node.
@@ -66,9 +67,9 @@ function createWindow(): void {
     pushState()
     layoutViews()
   }
-  const downloads = new DownloadManager(TAB_PARTITION, onExtrasChange)
+  const downloads = new DownloadManager(partition, onExtrasChange)
   downloads.attach()
-  const permissions = new PermissionManager(TAB_PARTITION, onExtrasChange)
+  const permissions = new PermissionManager(partition, onExtrasChange)
   permissions.attach()
 
   // Chrome height grows by a row for the download shelf and the permission prompt.
@@ -108,8 +109,8 @@ function createWindow(): void {
       schedulePersistTabs()
     },
     contentRegion(),
-    TAB_PARTITION,
-    // Log every navigation to history. workspaceId is null until Phase 3.
+    partition,
+    // Log every navigation to history. workspaceId tagging comes in a later step.
     (info) => logVisit(info.url, info.title, null)
   )
 
