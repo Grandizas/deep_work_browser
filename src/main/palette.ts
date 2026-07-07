@@ -78,6 +78,7 @@ export function computePaletteResults(query: string, ctx: PaletteContext): Palet
   // --- Static commands ---
   const statics: PaletteResult[] = [
     { id: 'new-tab', icon: '➕', title: 'New tab', cmd: 'tab:new' },
+    { id: 'today', icon: '📊', title: 'Today', subtitle: 'Open the dashboard', cmd: 'tab:new' },
     {
       id: 'focus-25',
       icon: '⏱',

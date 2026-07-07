@@ -4,7 +4,8 @@ import { DownloadManager } from './DownloadManager'
 import { PermissionManager } from './PermissionManager'
 import { NetworkBlocker } from './NetworkBlocker'
 import { decideNavigation } from './blocking'
-import { logOverride } from './history'
+import { logOverride, logBlock, getDashboardStats } from './history'
+import { dashboardDataUrl } from './dashboard'
 import { focus } from './FocusManager'
 import type { Workspace } from '../shared/types'
 
@@ -43,7 +44,9 @@ export class WorkspaceView {
       workspace.partition,
       onNavigate,
       decide,
-      (url) => logOverride(url, workspace.id)
+      (url) => logOverride(url, workspace.id),
+      (url) => logBlock(url, workspace.id),
+      () => dashboardDataUrl(getDashboardStats())
     )
     this.downloads.attach()
     this.permissions.attach()
