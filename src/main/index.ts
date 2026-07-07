@@ -6,7 +6,7 @@ import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
 import { WorkspaceView } from './WorkspaceView'
 import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
-import { initHistory, logVisit, closeHistory } from './history'
+import { initHistory, logVisit, closeHistory, logSession } from './history'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
@@ -514,6 +514,8 @@ app.whenReady().then(() => {
   initHistory()
   workspaces.init()
   roles.init()
+  // Log every finished focus session to SQLite (app-level, not per-window).
+  focus.onSessionEnd = (s) => logSession(s.workspaceId, s.startedAt, s.endedAt, s.completed)
   // Resume a focus session that was running when the app last closed/crashed.
   focus.restore(settings.getFocusState())
   installAppMenu(() => activeActions)

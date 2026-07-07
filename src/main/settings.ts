@@ -19,7 +19,8 @@ const IDLE_FOCUS: FocusPersisted = {
   workspaceId: null,
   allowlist: [],
   paused: false,
-  pausedRemainingMs: 0
+  pausedRemainingMs: 0,
+  startedAt: null
 }
 
 interface AppSettings {

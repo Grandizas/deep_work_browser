@@ -11,6 +11,15 @@ export interface FocusPersisted {
   allowlist: string[]
   paused: boolean
   pausedRemainingMs: number
+  startedAt: number | null
+}
+
+/** A finished focus session, reported for SQLite logging. */
+export interface FinishedSession {
+  workspaceId: string
+  startedAt: number
+  endedAt: number
+  completed: boolean
 }
 
 /**
@@ -29,12 +38,15 @@ class FocusManager {
   private allowlist: string[] = []
   private paused = false
   private pausedRemainingMs = 0
+  private startedAt: number | null = null
   private timer: NodeJS.Timeout | null = null
 
   /** Called on every phase transition (start / end / expiry). */
   onChange: (() => void) | null = null
   /** Called when a focus session finishes and auto-rolls into a break. */
   onComplete: (() => void) | null = null
+  /** Called when a focus session ends (completed or abandoned) — for logging. */
+  onSessionEnd: ((session: FinishedSession) => void) | null = null
 
   /** Start a focus session for a workspace, allowing only `allowlist` sites. */
   startFocus(workspaceId: string, durationMs: number, allowlist: string[]): void {
@@ -43,6 +55,7 @@ class FocusManager {
     this.allowlist = allowlist
     this.paused = false
     this.pausedRemainingMs = 0
+    this.startedAt = Date.now()
     this.endsAt = Date.now() + durationMs
     this.arm()
     this.emit()
@@ -61,14 +74,30 @@ class FocusManager {
 
   /** End the current session and return to idle. */
   end(): void {
+    // Ending a focus session early is an abandoned (incomplete) session.
+    if (this.phase === 'focus') this.reportSessionEnd(false)
     this.phase = 'idle'
     this.endsAt = null
     this.workspaceId = null
     this.allowlist = []
     this.paused = false
     this.pausedRemainingMs = 0
+    this.startedAt = null
     this.disarm()
     this.emit()
+  }
+
+  // Report a finished focus session for logging, then clear the start marker.
+  private reportSessionEnd(completed: boolean): void {
+    if (this.startedAt !== null && this.workspaceId) {
+      this.onSessionEnd?.({
+        workspaceId: this.workspaceId,
+        startedAt: this.startedAt,
+        endedAt: Date.now(),
+        completed
+      })
+    }
+    this.startedAt = null
   }
 
   /** Freeze the countdown, remembering the remaining time. */
@@ -124,7 +153,8 @@ class FocusManager {
       workspaceId: this.workspaceId,
       allowlist: this.allowlist,
       paused: this.paused,
-      pausedRemainingMs: this.pausedRemainingMs
+      pausedRemainingMs: this.pausedRemainingMs,
+      startedAt: this.startedAt
     }
   }
 
@@ -142,6 +172,7 @@ class FocusManager {
     this.allowlist = data.allowlist
     this.paused = data.paused
     this.pausedRemainingMs = data.pausedRemainingMs
+    this.startedAt = data.startedAt
     if (data.paused) {
       this.endsAt = null
     } else {
@@ -166,8 +197,9 @@ class FocusManager {
 
   private onExpire(): void {
     if (this.phase === 'focus') {
-      // Focus complete → auto-roll into a break (everything unlocked), and fire
-      // the completion celebration.
+      // Focus complete → log it, auto-roll into a break (everything unlocked),
+      // and fire the completion celebration.
+      this.reportSessionEnd(true)
       this.startBreak(BREAK_MS)
       this.onComplete?.()
     } else {
