@@ -90,6 +90,14 @@ function onEnter(): void {
     >
       {{ store.isActiveTabPinned ? '★' : '☆' }}
     </button>
+    <button
+      class="nav"
+      aria-label="Website roles settings"
+      title="Website roles"
+      @click="store.openSettings()"
+    >
+      ⚙
+    </button>
   </div>
 </template>
 

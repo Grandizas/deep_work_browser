@@ -84,6 +84,10 @@ export interface BrowserState {
   pinnedSites: string[]
   /** When true, show the "what are you working on?" picker instead of the browser. */
   showPicker: boolean
+  /** When true, show the full-window settings (roles management) screen. */
+  showSettings: boolean
+  /** Global website roles, shown/edited in the settings screen. */
+  roles: RolesConfig
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -110,6 +114,10 @@ export type Command =
   | 'workspace:start'
   | 'workspace:pin'
   | 'workspace:unpin'
+  | 'settings:open'
+  | 'settings:close'
+  | 'roles:add'
+  | 'roles:remove'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

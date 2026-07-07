@@ -18,6 +18,8 @@ export const useBrowserStore = defineStore('browser', {
     activeWorkspaceId: '',
     pinnedSites: [],
     showPicker: true,
+    showSettings: false,
+    roles: { essential: [], reference: [], distractions: [] },
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -40,6 +42,8 @@ export const useBrowserStore = defineStore('browser', {
       this.activeWorkspaceId = next.activeWorkspaceId
       this.pinnedSites = next.pinnedSites
       this.showPicker = next.showPicker
+      this.showSettings = next.showSettings
+      this.roles = next.roles
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -80,6 +84,18 @@ export const useBrowserStore = defineStore('browser', {
     },
     startWorkspace(id: string): void {
       send('workspace:start', { id })
+    },
+    openSettings(): void {
+      send('settings:open')
+    },
+    closeSettings(): void {
+      send('settings:close')
+    },
+    addRole(role: string, pattern: string): void {
+      send('roles:add', { role, pattern })
+    },
+    removeRole(role: string, pattern: string): void {
+      send('roles:remove', { role, pattern })
     },
     pinSite(url: string): void {
       send('workspace:pin', { url })

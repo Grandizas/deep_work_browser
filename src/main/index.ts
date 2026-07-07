@@ -9,7 +9,9 @@ import { settings } from './settings'
 import { initHistory, logVisit, closeHistory } from './history'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
-import type { WorkspaceSummary } from '../shared/types'
+import type { WorkspaceSummary, RolesConfig } from '../shared/types'
+
+const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
 
 /** Run `fn` after `ms` of quiet, resetting the timer on each call. */
 function debounce(fn: () => void, ms: number): () => void {
@@ -65,6 +67,8 @@ function createWindow(): void {
 
   // Start on the workspace picker; no WorkspaceView exists until one is chosen.
   let showPicker = true
+  // Full-window settings screen (hides the active tabs while open).
+  let showSettings = false
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -103,6 +107,8 @@ function createWindow(): void {
       activeWorkspaceId: activeId,
       pinnedSites: workspaces.get(activeId)?.pinnedSites ?? [],
       showPicker,
+      showSettings,
+      roles: roles.getGlobal(),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -240,6 +246,36 @@ function createWindow(): void {
     pushState()
   }
 
+  // Settings screen: hide the active tabs and take the chrome view full-window.
+  const openSettings = (): void => {
+    if (showPicker || showSettings) return
+    showSettings = true
+    activeView()?.hide()
+    layoutViews()
+    pushState()
+  }
+  const closeSettings = (): void => {
+    if (!showSettings) return
+    showSettings = false
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+
+  // Add / remove a site pattern in a global role list.
+  const editRole = (role: keyof RolesConfig, pattern: string, add: boolean): void => {
+    const pat = pattern.trim().toLowerCase()
+    if (!pat) return
+    const g = roles.getGlobal()
+    const next = add
+      ? g[role].includes(pat)
+        ? g[role]
+        : [...g[role], pat]
+      : g[role].filter((p) => p !== pat)
+    roles.setGlobal({ ...g, [role]: next })
+    pushState()
+  }
+
   // User-initiated new tab: open blank and drop the cursor in the address bar.
   const newTab = (): void => {
     activeView()?.tabs.create()
@@ -247,10 +283,10 @@ function createWindow(): void {
   }
 
   // Keep the chrome strip and the active workspace's tab sized to the window.
-  // During the picker the chrome view fills the whole window (no tabs exist yet).
+  // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showPicker) {
+    if (showPicker || showSettings) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -269,7 +305,13 @@ function createWindow(): void {
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
     if (event.sender !== chromeView.webContents) return
     if (!message || typeof message.cmd !== 'string') return
-    const payload = (message.payload ?? {}) as { id?: string; url?: string; granted?: boolean }
+    const payload = (message.payload ?? {}) as {
+      id?: string
+      url?: string
+      granted?: boolean
+      role?: string
+      pattern?: string
+    }
 
     switch (message.cmd) {
       case 'ui:ready':
@@ -321,6 +363,22 @@ function createWindow(): void {
         break
       case 'workspace:unpin':
         if (typeof payload.url === 'string') unpinSite(payload.url)
+        break
+      case 'settings:open':
+        openSettings()
+        break
+      case 'settings:close':
+        closeSettings()
+        break
+      case 'roles:add':
+      case 'roles:remove':
+        if (
+          typeof payload.role === 'string' &&
+          typeof payload.pattern === 'string' &&
+          (ROLE_KEYS as string[]).includes(payload.role)
+        ) {
+          editRole(payload.role as keyof RolesConfig, payload.pattern, message.cmd === 'roles:add')
+        }
         break
       default:
         console.warn('[main] unknown command:', message.cmd)
