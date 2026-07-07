@@ -9,6 +9,7 @@ import { settings } from './settings'
 import { initHistory, logVisit, closeHistory } from './history'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
+import { focus } from './FocusManager'
 import type { WorkspaceSummary, RolesConfig } from '../shared/types'
 
 const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
@@ -109,6 +110,7 @@ function createWindow(): void {
       showPicker,
       showSettings,
       roles: roles.getGlobal(),
+      focus: focus.snapshot(),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -301,6 +303,9 @@ function createWindow(): void {
   mainWindow.on('maximize', persistWindow)
   mainWindow.on('unmaximize', persistWindow)
 
+  // The focus timer lives in main; reflect its phase changes to this window.
+  focus.onChange = pushState
+
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -413,6 +418,7 @@ function createWindow(): void {
     workspaceViews.clear()
     if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
     if (activeActions?.newTab === newTab) activeActions = null
+    if (focus.onChange === pushState) focus.onChange = null
   })
 
   chromeView.webContents.once('did-finish-load', () => {

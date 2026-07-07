@@ -30,6 +30,20 @@ export interface Workspace {
   pinnedSites: string[]
 }
 
+/** Focus-session phase. */
+export type FocusPhase = 'idle' | 'focus' | 'break'
+
+/**
+ * Renderer-facing focus-session state. The countdown is computed in the renderer
+ * from `endsAt` vs the current time, so main only pushes on phase changes (not
+ * every second).
+ */
+export interface FocusSnapshot {
+  state: FocusPhase
+  endsAt: number | null
+  workspaceId: string | null
+}
+
 /**
  * Website role lists — patterns (hostnames or host+path prefixes) classifying
  * what each site is. Drives the blocking engine. Held globally with per-workspace
@@ -88,6 +102,8 @@ export interface BrowserState {
   showSettings: boolean
   /** Global website roles, shown/edited in the settings screen. */
   roles: RolesConfig
+  /** Current focus-session state (timer lives in main). */
+  focus: FocusSnapshot
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at

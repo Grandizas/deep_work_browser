@@ -88,7 +88,7 @@ Done when: opening Reddit in Coding workspace shows the speed bump, and Continue
 
 Goal: 50-minute sessions that actually change browser behavior.
 
-- [ ] `FocusManager` in main: `{state: idle|focus|break, endsAt, workspaceId, allowlist}` — timer lives in main so it survives UI reloads
+- [x] `FocusManager` in main: `{state: idle|focus|break, endsAt, workspaceId, allowlist}` — timer lives in main so it survives UI reloads
 - [ ] Start session UI: duration presets (25/50/90), uses current workspace's Essential+Reference sites as allowlist
 - [ ] During focus: blocking engine switches from "block distractions" to "allow only approved" mode
 - [ ] Timer display in chrome UI (subtle, always visible)

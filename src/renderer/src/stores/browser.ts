@@ -20,6 +20,7 @@ export const useBrowserStore = defineStore('browser', {
     showPicker: true,
     showSettings: false,
     roles: { essential: [], reference: [], distractions: [] },
+    focus: { state: 'idle', endsAt: null, workspaceId: null },
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -44,6 +45,7 @@ export const useBrowserStore = defineStore('browser', {
       this.showPicker = next.showPicker
       this.showSettings = next.showSettings
       this.roles = next.roles
+      this.focus = next.focus
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
