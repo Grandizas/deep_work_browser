@@ -50,6 +50,29 @@ function isInternal(url: string): boolean {
   return !/^https?:\/\//i.test(url)
 }
 
+// Path-based exceptions: sites that are distractions overall but have specific
+// paths worth allowing. YouTube's homepage and /feed are the doomscroll; a direct
+// /watch video is an intentional visit. Only applies in idle mode (see below).
+const SPECIAL_ALLOW: { host: string; allowPaths: string[] }[] = [
+  { host: 'youtube.com', allowPaths: ['/watch'] }
+]
+
+function specialCaseAllows(url: string): boolean {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return false
+  }
+  const host = u.hostname.replace(/^www\./, '')
+  for (const rule of SPECIAL_ALLOW) {
+    if (host === rule.host || host.endsWith('.' + rule.host)) {
+      return rule.allowPaths.some((p) => u.pathname === p || u.pathname.startsWith(p + '/'))
+    }
+  }
+  return false
+}
+
 /**
  * Approximate registrable domain (last two labels) of a URL, e.g.
  * `www.reddit.com` → `reddit.com`. Used to treat a site's own resources and
@@ -86,5 +109,9 @@ export function decideNavigation(
   if (focusState === 'focus') {
     return role === 'essential' || role === 'reference' ? 'allow' : 'block'
   }
-  return role === 'distraction' ? 'block' : 'allow'
+  // idle: block distractions, but honour path-based exceptions (e.g. YouTube /watch).
+  if (role === 'distraction') {
+    return specialCaseAllows(url) ? 'allow' : 'block'
+  }
+  return 'allow'
 }

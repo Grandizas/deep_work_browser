@@ -80,7 +80,7 @@ Goal: the browser knows what each site is.
 - [x] Layer 2: `will-navigate` interception → redirect to interstitial
 - [x] Interstitial page: "This isn't in your current workspace." with **Go Back / Take a Break / Continue Anyway** buttons (buttons message main via a query-param-driven local page + tiny dedicated preload for just this page)
 - [x] "Continue Anyway" logs the override to SQLite (this powers the dashboard's honesty later)
-- [ ] Special-case rules: block YouTube *homepage* but allow direct video URLs (path-based rule: block `youtube.com/$` and `/feed/*`, allow `/watch`)
+- [x] Special-case rules: block YouTube *homepage* but allow direct video URLs (path-based rule: block `youtube.com/$` and `/feed/*`, allow `/watch`)
 
 Done when: opening Reddit in Coding workspace shows the speed bump, and Continue Anyway still works (no guilt trips, per the philosophy).
 
