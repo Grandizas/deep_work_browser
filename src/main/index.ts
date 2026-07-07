@@ -253,6 +253,19 @@ function createWindow(): void {
     menu.popup({ window: mainWindow })
   }
 
+  // Menu on the active timer: pause/resume + end the session.
+  const showFocusControlMenu = (): void => {
+    const paused = focus.snapshot().paused
+    const menu = Menu.buildFromTemplate([
+      paused
+        ? { label: 'Resume', click: () => focus.resume() }
+        : { label: 'Pause', click: () => focus.pause() },
+      { type: 'separator' },
+      { label: 'End session', click: () => focus.end() }
+    ])
+    menu.popup({ window: mainWindow })
+  }
+
   // Pin / unpin a site in the active workspace's bookmarks row.
   const pinSite = (url: string): void => {
     const ws = workspaces.get(activeId)
@@ -331,6 +344,7 @@ function createWindow(): void {
       layoutViews()
       activeView()?.show(contentRegion())
     }
+    settings.setFocusState(focus.serialize())
     pushState()
   }
   // A finished focus session shows the full-window 🎉 celebration (tabs hidden).
@@ -405,6 +419,9 @@ function createWindow(): void {
         break
       case 'focus:menu':
         showFocusMenu()
+        break
+      case 'focus:control':
+        showFocusControlMenu()
         break
       case 'focus:dismiss':
         closeCompletion()
@@ -497,6 +514,8 @@ app.whenReady().then(() => {
   initHistory()
   workspaces.init()
   roles.init()
+  // Resume a focus session that was running when the app last closed/crashed.
+  focus.restore(settings.getFocusState())
   installAppMenu(() => activeActions)
 
   createWindow()

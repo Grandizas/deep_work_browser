@@ -93,7 +93,7 @@ Goal: 50-minute sessions that actually change browser behavior.
 - [x] During focus: blocking engine switches from "block distractions" to "allow only approved" mode
 - [x] Timer display in chrome UI (subtle, always visible)
 - [x] Session end: 🎉 completion screen, auto-start break mode (everything unlocked), break countdown
-- [ ] Pause/resume; persist timer state so a crash/restart restores it (feeds Session Restore later)
+- [x] Pause/resume; persist timer state so a crash/restart restores it (feeds Session Restore later)
 - [ ] Log sessions to SQLite: `{start, end, workspaceId, completed, overrides}`
 
 Done when: a full 50-min session works end to end, and stats are being recorded.

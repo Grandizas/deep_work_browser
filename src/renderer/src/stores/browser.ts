@@ -20,7 +20,7 @@ export const useBrowserStore = defineStore('browser', {
     showPicker: true,
     showSettings: false,
     roles: { essential: [], reference: [], distractions: [] },
-    focus: { state: 'idle', endsAt: null, workspaceId: null },
+    focus: { state: 'idle', endsAt: null, workspaceId: null, paused: false, remainingMs: 0 },
     showCompletion: false,
     focusUrlBarSeq: 0
   }),
@@ -88,6 +88,9 @@ export const useBrowserStore = defineStore('browser', {
     },
     openFocusMenu(): void {
       send('focus:menu')
+    },
+    openFocusControlMenu(): void {
+      send('focus:control')
     },
     dismissCompletion(): void {
       send('focus:dismiss')

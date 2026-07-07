@@ -42,6 +42,10 @@ export interface FocusSnapshot {
   state: FocusPhase
   endsAt: number | null
   workspaceId: string | null
+  /** Paused sessions freeze the countdown; `endsAt` is null and time is `remainingMs`. */
+  paused: boolean
+  /** Remaining time; the renderer uses this while paused, else ticks from `endsAt`. */
+  remainingMs: number
 }
 
 /**
@@ -137,6 +141,7 @@ export type Command =
   | 'roles:add'
   | 'roles:remove'
   | 'focus:menu'
+  | 'focus:control'
   | 'focus:dismiss'
 
 /** Envelope for every renderer → main command. */

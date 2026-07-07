@@ -3,6 +3,16 @@ import type { FocusPhase, FocusSnapshot } from '../shared/types'
 // Break length after a completed focus session (everything unlocked).
 const BREAK_MS = 5 * 60 * 1000
 
+/** Persisted focus state, so a crash/restart resumes the session. */
+export interface FocusPersisted {
+  phase: FocusPhase
+  endsAt: number | null
+  workspaceId: string | null
+  allowlist: string[]
+  paused: boolean
+  pausedRemainingMs: number
+}
+
 /**
  * The focus-session state machine, owned by the main process so the timer
  * survives renderer reloads. Holds one session at a time:
@@ -17,6 +27,8 @@ class FocusManager {
   private endsAt: number | null = null
   private workspaceId: string | null = null
   private allowlist: string[] = []
+  private paused = false
+  private pausedRemainingMs = 0
   private timer: NodeJS.Timeout | null = null
 
   /** Called on every phase transition (start / end / expiry). */
@@ -29,6 +41,8 @@ class FocusManager {
     this.phase = 'focus'
     this.workspaceId = workspaceId
     this.allowlist = allowlist
+    this.paused = false
+    this.pausedRemainingMs = 0
     this.endsAt = Date.now() + durationMs
     this.arm()
     this.emit()
@@ -38,6 +52,8 @@ class FocusManager {
   startBreak(durationMs: number): void {
     this.phase = 'break'
     this.allowlist = []
+    this.paused = false
+    this.pausedRemainingMs = 0
     this.endsAt = Date.now() + durationMs
     this.arm()
     this.emit()
@@ -49,7 +65,29 @@ class FocusManager {
     this.endsAt = null
     this.workspaceId = null
     this.allowlist = []
+    this.paused = false
+    this.pausedRemainingMs = 0
     this.disarm()
+    this.emit()
+  }
+
+  /** Freeze the countdown, remembering the remaining time. */
+  pause(): void {
+    if (this.phase === 'idle' || this.paused || this.endsAt === null) return
+    this.pausedRemainingMs = Math.max(0, this.endsAt - Date.now())
+    this.endsAt = null
+    this.paused = true
+    this.disarm()
+    this.emit()
+  }
+
+  /** Resume from a paused session, continuing the remaining time. */
+  resume(): void {
+    if (!this.paused) return
+    this.endsAt = Date.now() + this.pausedRemainingMs
+    this.paused = false
+    this.pausedRemainingMs = 0
+    this.arm()
     this.emit()
   }
 
@@ -64,7 +102,52 @@ class FocusManager {
   }
 
   snapshot(): FocusSnapshot {
-    return { state: this.phase, endsAt: this.endsAt, workspaceId: this.workspaceId }
+    const remainingMs = this.paused
+      ? this.pausedRemainingMs
+      : this.endsAt
+        ? Math.max(0, this.endsAt - Date.now())
+        : 0
+    return {
+      state: this.phase,
+      endsAt: this.endsAt,
+      workspaceId: this.workspaceId,
+      paused: this.paused,
+      remainingMs
+    }
+  }
+
+  /** Snapshot for persistence. */
+  serialize(): FocusPersisted {
+    return {
+      phase: this.phase,
+      endsAt: this.endsAt,
+      workspaceId: this.workspaceId,
+      allowlist: this.allowlist,
+      paused: this.paused,
+      pausedRemainingMs: this.pausedRemainingMs
+    }
+  }
+
+  /**
+   * Restore a persisted session after a restart. A running session whose end
+   * already passed during downtime is dropped; paused sessions and still-running
+   * ones resume. Does not emit — the caller pushes state afterwards.
+   */
+  restore(data: FocusPersisted): void {
+    if (data.phase === 'idle') return
+    if (!data.paused && (data.endsAt === null || data.endsAt <= Date.now())) return
+
+    this.phase = data.phase
+    this.workspaceId = data.workspaceId
+    this.allowlist = data.allowlist
+    this.paused = data.paused
+    this.pausedRemainingMs = data.pausedRemainingMs
+    if (data.paused) {
+      this.endsAt = null
+    } else {
+      this.endsAt = data.endsAt
+      this.arm()
+    }
   }
 
   // Fire once when the current session's timer elapses.

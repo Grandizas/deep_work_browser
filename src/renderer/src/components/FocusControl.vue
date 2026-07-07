@@ -23,8 +23,12 @@ watch(
 onUnmounted(() => clearInterval(ticker))
 
 const countdown = computed(() => {
-  const endsAt = store.focus.endsAt
-  const totalSec = endsAt ? Math.max(0, Math.ceil((endsAt - now.value) / 1000)) : 0
+  const f = store.focus
+  const totalSec = f.paused
+    ? Math.ceil(f.remainingMs / 1000)
+    : f.endsAt
+      ? Math.max(0, Math.ceil((f.endsAt - now.value) / 1000))
+      : 0
   const m = Math.floor(totalSec / 60)
   const s = totalSec % 60
   return `${m}:${String(s).padStart(2, '0')}`
@@ -43,16 +47,19 @@ const countdown = computed(() => {
     Focus
   </button>
 
-  <!-- Active: a subtle, always-visible countdown. -->
-  <div
+  <!-- Active: a subtle, always-visible countdown. Click to pause/resume/end. -->
+  <button
     v-else
     class="focus-active"
-    :class="store.focus.state"
-    :title="store.focus.state === 'focus' ? 'Focus session' : 'Break'"
+    :class="[store.focus.state, { paused: store.focus.paused }]"
+    :title="store.focus.paused ? 'Paused — click for options' : 'Click to pause or end'"
+    @click="store.openFocusControlMenu()"
   >
-    <span class="glyph">{{ store.focus.state === 'focus' ? '●' : '☕' }}</span>
+    <span class="glyph">{{
+      store.focus.paused ? '⏸' : store.focus.state === 'focus' ? '●' : '☕'
+    }}</span>
     <span class="time">{{ countdown }}</span>
-  </div>
+  </button>
 </template>
 
 <style scoped>
@@ -86,15 +93,27 @@ const countdown = computed(() => {
   gap: 6px;
   height: 30px;
   padding: 0 12px;
+  border: none;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
+  cursor: default;
+}
+.focus-active:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .focus-active.break {
   background: color-mix(in srgb, #22c55e 20%, transparent);
+}
+.focus-active.break:hover {
+  background: color-mix(in srgb, #22c55e 30%, transparent);
+}
+.focus-active.paused {
+  background: var(--color-background-mute);
+  color: var(--ev-c-text-2);
 }
 .focus-active .glyph {
   font-size: 10px;

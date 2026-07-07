@@ -13,8 +13,12 @@ onMounted(() => {
 onUnmounted(() => clearInterval(ticker))
 
 const countdown = computed(() => {
-  const endsAt = store.focus.endsAt
-  const totalSec = endsAt ? Math.max(0, Math.ceil((endsAt - now.value) / 1000)) : 0
+  const f = store.focus
+  const totalSec = f.paused
+    ? Math.ceil(f.remainingMs / 1000)
+    : f.endsAt
+      ? Math.max(0, Math.ceil((f.endsAt - now.value) / 1000))
+      : 0
   const m = Math.floor(totalSec / 60)
   const s = totalSec % 60
   return `${m}:${String(s).padStart(2, '0')}`
