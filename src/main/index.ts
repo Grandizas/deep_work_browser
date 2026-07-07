@@ -8,6 +8,7 @@ import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
 import { initHistory, logVisit, closeHistory } from './history'
 import { workspaces } from './workspaces'
+import { roles } from './roles'
 import type { WorkspaceSummary } from '../shared/types'
 
 /** Run `fn` after `ms` of quiet, resetting the timer on each call. */
@@ -381,6 +382,7 @@ app.whenReady().then(() => {
 
   initHistory()
   workspaces.init()
+  roles.init()
   installAppMenu(() => activeActions)
 
   createWindow()

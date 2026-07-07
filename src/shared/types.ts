@@ -30,6 +30,17 @@ export interface Workspace {
   pinnedSites: string[]
 }
 
+/**
+ * Website role lists — patterns (hostnames or host+path prefixes) classifying
+ * what each site is. Drives the blocking engine. Held globally with per-workspace
+ * overrides.
+ */
+export interface RolesConfig {
+  essential: string[]
+  reference: string[]
+  distractions: string[]
+}
+
 /** The renderer-facing subset of a Workspace, used to render the switcher. */
 export interface WorkspaceSummary {
   id: string

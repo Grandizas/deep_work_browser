@@ -73,7 +73,7 @@ Done when: Finance logins don't exist in Personal; each workspace reopens with i
 
 Goal: the browser knows what each site is.
 
-- [ ] Roles config in electron-store: `{essential: [], reference: [], distractions: []}` — global list with per-workspace overrides
+- [x] Roles config in electron-store: `{essential: [], reference: [], distractions: []}` — global list with per-workspace overrides
 - [ ] Simple management UI (settings page as an internal route in the chrome renderer, or an internal `app://settings` page)
 - [ ] Blocking engine in main: given active workspace + focus state, decide allow / block per navigation
 - [ ] Layer 1: `webRequest.onBeforeRequest` on each workspace session (catches embeds, redirects)
