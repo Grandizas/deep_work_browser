@@ -105,7 +105,7 @@ Goal: never touch menus.
 - [x] Ctrl+K overlay in the chrome renderer (this is pure Vue work — your comfort zone)
 - [x] Command registry: static commands + parameterized (`timer 30`, `block youtube`) + fuzzy site jump (searches history + roles + open tabs)
 - [x] Commands dispatch through the same IPC `cmd:*` channel — the palette is just another caller
-- [ ] Minimum command set: `timer <min>`, `new <workspace> session`, `block <site>`, `notes`, `today` (dashboard), workspace names, open-tab switching, history search
+- [x] Minimum command set: `timer <min>`, `new <workspace> session`, `block <site>`, workspace names, open-tab switching, history search — (`notes` deferred to Phase 7, `today`/dashboard deferred to Phase 8; both get palette commands when those features land)
 
 Done when: you stop using the mouse for navigation.
 

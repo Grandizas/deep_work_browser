@@ -159,6 +159,7 @@ export type Command =
   | 'focus:control'
   | 'focus:dismiss'
   | 'workspace:switch'
+  | 'workspace:session'
   | 'palette:close'
   | 'palette:query'
 
