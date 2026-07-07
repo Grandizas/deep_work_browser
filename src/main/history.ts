@@ -5,6 +5,8 @@ import { join } from 'path'
 let db: Database.Database | null = null
 let insertVisit: Database.Statement | null = null
 let insertOverride: Database.Statement | null = null
+let insertSession: Database.Statement | null = null
+let countOverrides: Database.Statement | null = null
 
 /**
  * Open the history database and ensure its schema exists. Call after app ready.
@@ -34,6 +36,16 @@ export function initHistory(): void {
         overridden_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_overrides_at ON overrides (overridden_at);
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id TEXT,
+        started_at   INTEGER NOT NULL,
+        ended_at     INTEGER NOT NULL,
+        completed    INTEGER NOT NULL,
+        overrides    INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions (started_at);
     `)
     insertVisit = db.prepare(
       'INSERT INTO history (url, title, workspace_id, visited_at) VALUES (?, ?, ?, ?)'
@@ -41,11 +53,19 @@ export function initHistory(): void {
     insertOverride = db.prepare(
       'INSERT INTO overrides (url, workspace_id, overridden_at) VALUES (?, ?, ?)'
     )
+    insertSession = db.prepare(
+      'INSERT INTO sessions (workspace_id, started_at, ended_at, completed, overrides) VALUES (?, ?, ?, ?, ?)'
+    )
+    countOverrides = db.prepare(
+      'SELECT COUNT(*) AS n FROM overrides WHERE workspace_id = ? AND overridden_at BETWEEN ? AND ?'
+    )
   } catch (err) {
     console.error('[history] initialization failed; history logging disabled:', err)
     db = null
     insertVisit = null
     insertOverride = null
+    insertSession = null
+    countOverrides = null
   }
 }
 
@@ -64,9 +84,26 @@ export function logOverride(url: string, workspaceId: string | null): void {
   insertOverride.run(url, workspaceId, Date.now())
 }
 
+/**
+ * Log a finished focus session. `overrides` is the count of Continue-Anyway
+ * overrides in that workspace during the session window.
+ */
+export function logSession(
+  workspaceId: string,
+  startedAt: number,
+  endedAt: number,
+  completed: boolean
+): void {
+  if (!insertSession || !countOverrides) return
+  const { n } = countOverrides.get(workspaceId, startedAt, endedAt) as { n: number }
+  insertSession.run(workspaceId, startedAt, endedAt, completed ? 1 : 0, n)
+}
+
 export function closeHistory(): void {
   db?.close()
   db = null
   insertVisit = null
   insertOverride = null
+  insertSession = null
+  countOverrides = null
 }

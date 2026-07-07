@@ -6,9 +6,10 @@ import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
 import { WorkspaceView } from './WorkspaceView'
 import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
-import { initHistory, logVisit, closeHistory } from './history'
+import { initHistory, logVisit, closeHistory, logSession } from './history'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
+import { focus } from './FocusManager'
 import type { WorkspaceSummary, RolesConfig } from '../shared/types'
 
 const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
@@ -69,6 +70,8 @@ function createWindow(): void {
   let showPicker = true
   // Full-window settings screen (hides the active tabs while open).
   let showSettings = false
+  // Full-window focus-complete / break celebration screen.
+  let showCompletion = false
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -109,6 +112,8 @@ function createWindow(): void {
       showPicker,
       showSettings,
       roles: roles.getGlobal(),
+      focus: focus.snapshot(),
+      showCompletion,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -231,6 +236,36 @@ function createWindow(): void {
     pushState()
   }
 
+  // Start-focus presets (minutes). A session's allowlist is the current
+  // workspace's Essential + Reference sites, snapshotted at start.
+  const FOCUS_PRESETS = [25, 50, 90]
+  const startFocusSession = (minutes: number): void => {
+    const eff = roles.getEffective(activeId)
+    focus.startFocus(activeId, minutes * 60_000, [...eff.essential, ...eff.reference])
+  }
+  const showFocusMenu = (): void => {
+    const menu = Menu.buildFromTemplate(
+      FOCUS_PRESETS.map((min) => ({
+        label: `${min} minutes`,
+        click: () => startFocusSession(min)
+      }))
+    )
+    menu.popup({ window: mainWindow })
+  }
+
+  // Menu on the active timer: pause/resume + end the session.
+  const showFocusControlMenu = (): void => {
+    const paused = focus.snapshot().paused
+    const menu = Menu.buildFromTemplate([
+      paused
+        ? { label: 'Resume', click: () => focus.resume() }
+        : { label: 'Pause', click: () => focus.pause() },
+      { type: 'separator' },
+      { label: 'End session', click: () => focus.end() }
+    ])
+    menu.popup({ window: mainWindow })
+  }
+
   // Pin / unpin a site in the active workspace's bookmarks row.
   const pinSite = (url: string): void => {
     const ws = workspaces.get(activeId)
@@ -287,7 +322,7 @@ function createWindow(): void {
   // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showPicker || showSettings) {
+    if (showPicker || showSettings || showCompletion) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -300,6 +335,32 @@ function createWindow(): void {
   mainWindow.on('move', schedulePersistWindow)
   mainWindow.on('maximize', persistWindow)
   mainWindow.on('unmaximize', persistWindow)
+
+  // The focus timer lives in main; reflect its phase changes to this window.
+  // When a break elapses back to idle, dismiss the completion screen too.
+  focus.onChange = () => {
+    if (showCompletion && focus.snapshot().state === 'idle') {
+      showCompletion = false
+      layoutViews()
+      activeView()?.show(contentRegion())
+    }
+    settings.setFocusState(focus.serialize())
+    pushState()
+  }
+  // A finished focus session shows the full-window 🎉 celebration (tabs hidden).
+  focus.onComplete = () => {
+    activeView()?.hide()
+    showCompletion = true
+    layoutViews()
+    pushState()
+  }
+  const closeCompletion = (): void => {
+    if (!showCompletion) return
+    showCompletion = false
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
 
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
@@ -355,6 +416,15 @@ function createWindow(): void {
         break
       case 'workspace:menu':
         showWorkspaceMenu()
+        break
+      case 'focus:menu':
+        showFocusMenu()
+        break
+      case 'focus:control':
+        showFocusControlMenu()
+        break
+      case 'focus:dismiss':
+        closeCompletion()
         break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)
@@ -413,6 +483,8 @@ function createWindow(): void {
     workspaceViews.clear()
     if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
     if (activeActions?.newTab === newTab) activeActions = null
+    focus.onChange = null
+    focus.onComplete = null
   })
 
   chromeView.webContents.once('did-finish-load', () => {
@@ -442,6 +514,13 @@ app.whenReady().then(() => {
   initHistory()
   workspaces.init()
   roles.init()
+  // Log every finished focus session to SQLite (app-level, not per-window).
+  focus.onSessionEnd = (s) => logSession(s.workspaceId, s.startedAt, s.endedAt, s.completed)
+  // Resume a focus session that was running when the app last closed/crashed,
+  // then re-persist: a session that elapsed offline is logged once and reset to
+  // idle here, so it isn't re-logged on the next launch.
+  focus.restore(settings.getFocusState())
+  settings.setFocusState(focus.serialize())
   installAppMenu(() => activeActions)
 
   createWindow()

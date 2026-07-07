@@ -5,6 +5,7 @@ import { PermissionManager } from './PermissionManager'
 import { NetworkBlocker } from './NetworkBlocker'
 import { decideNavigation } from './blocking'
 import { logOverride } from './history'
+import { focus } from './FocusManager'
 import type { Workspace } from '../shared/types'
 
 /**
@@ -30,8 +31,11 @@ export class WorkspaceView {
     this.downloads = new DownloadManager(workspace.partition, onChange)
     this.permissions = new PermissionManager(workspace.partition, onChange)
     this.blocker = new NetworkBlocker(workspace.partition, workspace.id)
-    // Layer 2 decision: focus state is 'idle' until Phase 5's FocusManager.
-    const decide = (url: string): 'allow' | 'block' => decideNavigation(url, workspace.id, 'idle')
+    // Layer 2 decision, evaluated per navigation: a focus session for THIS
+    // workspace flips the engine to "allow only approved"; a break unlocks
+    // everything; otherwise the idle "block distractions" rule applies.
+    const decide = (url: string): 'allow' | 'block' =>
+      decideNavigation(url, workspace.id, focus.phaseFor(workspace.id))
     this.tabs = new TabManager(
       window,
       onChange,
