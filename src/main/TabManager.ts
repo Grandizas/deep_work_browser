@@ -52,7 +52,9 @@ export class TabManager {
     // Called on each top-level navigation so the caller can log history.
     private readonly onNavigate: (info: { url: string; title: string }) => void,
     // Blocking decision for a candidate navigation (workspace + focus aware).
-    private readonly decide: (url: string) => 'allow' | 'block'
+    private readonly decide: (url: string) => 'allow' | 'block',
+    // Called when the user chooses "Continue Anyway" past the interstitial.
+    private readonly onOverride: (url: string) => void
   ) {}
 
   private get active(): Tab | undefined {
@@ -136,6 +138,7 @@ export class TabManager {
         if (action.type === 'continue') {
           // Override this site so its own redirects/navigations aren't re-blocked.
           tab.overrideSite = siteOf(action.url)
+          this.onOverride(action.url)
           wc.loadURL(action.url)
         } else {
           // "Take a Break" — full break mode is Phase 5; for now, a clean slate.

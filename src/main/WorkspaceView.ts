@@ -4,6 +4,7 @@ import { DownloadManager } from './DownloadManager'
 import { PermissionManager } from './PermissionManager'
 import { NetworkBlocker } from './NetworkBlocker'
 import { decideNavigation } from './blocking'
+import { logOverride } from './history'
 import type { Workspace } from '../shared/types'
 
 /**
@@ -37,7 +38,8 @@ export class WorkspaceView {
       initialRegion,
       workspace.partition,
       onNavigate,
-      decide
+      decide,
+      (url) => logOverride(url, workspace.id)
     )
     this.downloads.attach()
     this.permissions.attach()
