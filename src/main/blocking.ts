@@ -24,8 +24,14 @@ export function matchesPattern(url: string, pattern: string): boolean {
   if (!hostMatches) return false
   if (patPath.length === 0) return true
 
-  // Path-prefix match, e.g. pattern `youtube.com/feed` blocks `/feed/subscriptions`.
-  return parsed.pathname.startsWith('/' + patPath.join('/'))
+  // Path-prefix match on a segment boundary, so `youtube.com/feed` matches
+  // `/feed` and `/feed/subscriptions` but not `/feedback`.
+  return pathHasPrefix(parsed.pathname, '/' + patPath.join('/'))
+}
+
+/** True if `pathname` equals `prefix` or continues past it on a `/` boundary. */
+function pathHasPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(prefix + '/')
 }
 
 function firstMatch(url: string, config: RolesConfig): SiteRole | null {
@@ -67,7 +73,7 @@ function specialCaseAllows(url: string): boolean {
   const host = u.hostname.replace(/^www\./, '')
   for (const rule of SPECIAL_ALLOW) {
     if (host === rule.host || host.endsWith('.' + rule.host)) {
-      return rule.allowPaths.some((p) => u.pathname === p || u.pathname.startsWith(p + '/'))
+      return rule.allowPaths.some((p) => pathHasPrefix(u.pathname, p))
     }
   }
   return false

@@ -133,18 +133,22 @@ export class TabManager {
       const action = parseInterstitialAction(url)
       if (action) {
         event.preventDefault()
+        // The URL this tab is currently blocking (interstitial showing).
+        const blocked = tab.blockedUrl
         tab.errorUrl = null
         tab.blockedUrl = null
-        if (action.type === 'continue') {
-          // Override this site so its own redirects/navigations aren't re-blocked.
-          tab.overrideSite = siteOf(action.url)
-          this.onOverride(action.url)
-          wc.loadURL(action.url)
-        } else {
+        if (action.type === 'break') {
           // "Take a Break" — full break mode is Phase 5; for now, a clean slate.
           tab.overrideSite = null
           wc.loadURL('about:blank')
+        } else if (blocked && action.url === blocked) {
+          // Only honour Continue Anyway for the URL that was actually blocked —
+          // otherwise any page could forge this navigation to bypass blocking.
+          tab.overrideSite = siteOf(action.url)
+          this.onOverride(action.url)
+          wc.loadURL(action.url)
         }
+        // A forged/stale continue (no matching interstitial) is ignored.
         return
       }
       // Stay on an overridden site (its own redirects/links) without re-blocking.
