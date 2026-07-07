@@ -51,6 +51,24 @@ function isInternal(url: string): boolean {
 }
 
 /**
+ * Approximate registrable domain (last two labels) of a URL, e.g.
+ * `www.reddit.com` → `reddit.com`. Used to treat a site's own resources and
+ * redirects as first-party. Not a full public-suffix implementation.
+ */
+export function siteOf(url: string): string {
+  try {
+    return new URL(url).hostname.split('.').slice(-2).join('.')
+  } catch {
+    return ''
+  }
+}
+
+export function sameSite(a: string, b: string): boolean {
+  const sa = siteOf(a)
+  return sa !== '' && sa === siteOf(b)
+}
+
+/**
  * Decide allow/block for a navigation given the active workspace and focus state:
  * - break: everything allowed (the reward),
  * - focus: only Essential/Reference (approved) allowed,

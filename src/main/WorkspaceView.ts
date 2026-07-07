@@ -3,6 +3,7 @@ import { TabManager } from './TabManager'
 import { DownloadManager } from './DownloadManager'
 import { PermissionManager } from './PermissionManager'
 import { NetworkBlocker } from './NetworkBlocker'
+import { decideNavigation } from './blocking'
 import type { Workspace } from '../shared/types'
 
 /**
@@ -28,7 +29,16 @@ export class WorkspaceView {
     this.downloads = new DownloadManager(workspace.partition, onChange)
     this.permissions = new PermissionManager(workspace.partition, onChange)
     this.blocker = new NetworkBlocker(workspace.partition, workspace.id)
-    this.tabs = new TabManager(window, onChange, initialRegion, workspace.partition, onNavigate)
+    // Layer 2 decision: focus state is 'idle' until Phase 5's FocusManager.
+    const decide = (url: string): 'allow' | 'block' => decideNavigation(url, workspace.id, 'idle')
+    this.tabs = new TabManager(
+      window,
+      onChange,
+      initialRegion,
+      workspace.partition,
+      onNavigate,
+      decide
+    )
     this.downloads.attach()
     this.permissions.attach()
     this.blocker.attach()

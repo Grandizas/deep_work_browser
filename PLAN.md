@@ -77,8 +77,8 @@ Goal: the browser knows what each site is.
 - [x] Simple management UI (settings page as an internal route in the chrome renderer, or an internal `app://settings` page)
 - [x] Blocking engine in main: given active workspace + focus state, decide allow / block per navigation
 - [x] Layer 1: `webRequest.onBeforeRequest` on each workspace session (catches embeds, redirects)
-- [ ] Layer 2: `will-navigate` interception → redirect to interstitial
-- [ ] Interstitial page: "This isn't in your current workspace." with **Go Back / Take a Break / Continue Anyway** buttons (buttons message main via a query-param-driven local page + tiny dedicated preload for just this page)
+- [x] Layer 2: `will-navigate` interception → redirect to interstitial
+- [x] Interstitial page: "This isn't in your current workspace." with **Go Back / Take a Break / Continue Anyway** buttons (buttons message main via a query-param-driven local page + tiny dedicated preload for just this page)
 - [ ] "Continue Anyway" logs the override to SQLite (this powers the dashboard's honesty later)
 - [ ] Special-case rules: block YouTube *homepage* but allow direct video URLs (path-based rule: block `youtube.com/$` and `/feed/*`, allow `/watch`)
 

@@ -134,7 +134,8 @@ function createWindow(): void {
   const restoreTabs = (view: WorkspaceView, workspaceId: string): void => {
     const saved = settings.getOpenTabs(workspaceId)
     if (saved.urls.length > 0) {
-      const ids = saved.urls.map((url) => view.tabs.create(url))
+      // Restore without blocking — the user explicitly had these open.
+      const ids = saved.urls.map((url) => view.tabs.create(url, false))
       const target = ids[saved.activeIndex] ?? ids[0]
       if (target) view.tabs.activate(target)
     } else {

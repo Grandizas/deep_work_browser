@@ -8,6 +8,8 @@ import {
   type MenuItemConstructorOptions
 } from 'electron'
 import { toNavigationUrl } from '../shared/url'
+import { interstitialUrl, parseInterstitialAction } from './interstitial'
+import { siteOf } from './blocking'
 import type { BrowserState, TabState } from '../shared/types'
 
 interface Tab {
@@ -17,6 +19,13 @@ interface Tab {
   // When a load fails we show a local error page; this remembers the URL the
   // user actually tried so the address bar keeps showing it (not the data URL).
   errorUrl: string | null
+  // When a navigation is blocked we show the interstitial; this remembers the
+  // blocked destination for the address bar and for "reload"/"continue".
+  blockedUrl: string | null
+  // After "Continue Anyway", the site (registrable domain) the user chose to
+  // override, so its own redirects/navigations aren't re-blocked. Cleared when
+  // navigating to a different site.
+  overrideSite: string | null
 }
 
 let tabSeq = 0
@@ -41,15 +50,21 @@ export class TabManager {
     // gives each workspace its own partition; for now all tabs share one.
     private readonly partition: string,
     // Called on each top-level navigation so the caller can log history.
-    private readonly onNavigate: (info: { url: string; title: string }) => void
+    private readonly onNavigate: (info: { url: string; title: string }) => void,
+    // Blocking decision for a candidate navigation (workspace + focus aware).
+    private readonly decide: (url: string) => 'allow' | 'block'
   ) {}
 
   private get active(): Tab | undefined {
     return this.tabs.find((t) => t.id === this.activeId)
   }
 
-  /** Create a tab, load `url`, and make it active. Returns the new tab id. */
-  create(url = 'about:blank'): string {
+  /**
+   * Create a tab, load `url`, and make it active. `block` runs the URL through
+   * the blocking engine (showing the interstitial if blocked); pass false to
+   * bypass it (e.g. restoring a session's tabs). Returns the new tab id.
+   */
+  create(url = 'about:blank', block = true): string {
     const view = new WebContentsView({
       webPreferences: {
         partition: this.partition,
@@ -58,13 +73,33 @@ export class TabManager {
         sandbox: true
       }
     })
-    const tab: Tab = { id: nextId(), view, favicon: null, errorUrl: null }
+    const tab: Tab = {
+      id: nextId(),
+      view,
+      favicon: null,
+      errorUrl: null,
+      blockedUrl: null,
+      overrideSite: null
+    }
     this.tabs.push(tab)
     this.window.contentView.addChildView(view)
     this.wireEvents(tab)
-    view.webContents.loadURL(url)
+    this.loadInTab(tab, url, block)
     this.activate(tab.id)
     return tab.id
+  }
+
+  // Load a URL into a tab, routing blocked distractions to the interstitial.
+  private loadInTab(tab: Tab, url: string, check: boolean): void {
+    tab.errorUrl = null
+    tab.blockedUrl = null
+    tab.overrideSite = null
+    if (check && this.decide(url) === 'block') {
+      tab.blockedUrl = url
+      tab.view.webContents.loadURL(interstitialUrl(url))
+    } else {
+      tab.view.webContents.loadURL(url)
+    }
   }
 
   private wireEvents(tab: Tab): void {
@@ -90,6 +125,39 @@ export class TabManager {
       wc.loadURL(errorPage(validatedURL, errorDescription))
       changed()
     })
+    // Layer 2: intercept renderer-initiated navigations (link clicks, redirects).
+    wc.on('will-navigate', (event, url) => {
+      // Interstitial button actions arrive as navigations to our sentinel host.
+      const action = parseInterstitialAction(url)
+      if (action) {
+        event.preventDefault()
+        tab.errorUrl = null
+        tab.blockedUrl = null
+        if (action.type === 'continue') {
+          // Override this site so its own redirects/navigations aren't re-blocked.
+          tab.overrideSite = siteOf(action.url)
+          wc.loadURL(action.url)
+        } else {
+          // "Take a Break" — full break mode is Phase 5; for now, a clean slate.
+          tab.overrideSite = null
+          wc.loadURL('about:blank')
+        }
+        return
+      }
+      // Stay on an overridden site (its own redirects/links) without re-blocking.
+      if (tab.overrideSite && siteOf(url) === tab.overrideSite) return
+
+      if (this.decide(url) === 'block') {
+        event.preventDefault()
+        tab.overrideSite = null
+        tab.blockedUrl = url
+        wc.loadURL(interstitialUrl(url))
+      } else {
+        // Navigated to a different allowed site — the override no longer applies.
+        tab.overrideSite = null
+      }
+    })
+
     // New windows / target=_blank open as tabs in our strip, never popups.
     wc.setWindowOpenHandler(({ url }) => {
       this.create(url)
@@ -185,8 +253,8 @@ export class TabManager {
     if (!tab) return
     const url = toNavigationUrl(input)
     if (!url) return
-    tab.errorUrl = null
-    tab.view.webContents.loadURL(url)
+    // Address-bar navigations don't fire will-navigate, so block-check here.
+    this.loadInTab(tab, url, true)
   }
 
   back(): void {
@@ -195,6 +263,8 @@ export class TabManager {
     const wc = tab.view.webContents
     if (wc.navigationHistory.canGoBack()) {
       tab.errorUrl = null
+      tab.blockedUrl = null
+      tab.overrideSite = null
       wc.navigationHistory.goBack()
     }
   }
@@ -205,6 +275,8 @@ export class TabManager {
     const wc = tab.view.webContents
     if (wc.navigationHistory.canGoForward()) {
       tab.errorUrl = null
+      tab.blockedUrl = null
+      tab.overrideSite = null
       wc.navigationHistory.goForward()
     }
   }
@@ -213,8 +285,11 @@ export class TabManager {
     const tab = this.active
     if (!tab) return
     const wc = tab.view.webContents
-    // On an error page, reload should retry the URL that failed, not the data URL.
-    if (tab.errorUrl) {
+    // On the interstitial, reload re-checks the blocked URL (still blocked → stays).
+    if (tab.blockedUrl) {
+      this.loadInTab(tab, tab.blockedUrl, true)
+    } else if (tab.errorUrl) {
+      // On an error page, reload retries the URL that failed, not the data URL.
       const retry = tab.errorUrl
       tab.errorUrl = null
       wc.loadURL(retry)
@@ -258,7 +333,7 @@ export class TabManager {
         const dead = wc.isDestroyed()
         return {
           id: tab.id,
-          url: tab.errorUrl ?? (dead ? '' : wc.getURL()),
+          url: tab.blockedUrl ?? tab.errorUrl ?? (dead ? '' : wc.getURL()),
           title: dead ? '' : wc.getTitle(),
           favicon: tab.favicon,
           isLoading: dead ? false : wc.isLoading(),

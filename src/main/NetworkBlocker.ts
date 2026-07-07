@@ -1,5 +1,5 @@
 import { session } from 'electron'
-import { roleForUrl } from './blocking'
+import { roleForUrl, sameSite } from './blocking'
 
 /**
  * Network-layer blocking (Layer 1) for one workspace session. Cancels requests
@@ -8,9 +8,13 @@ import { roleForUrl } from './blocking'
  *
  * Top-level (main-frame) navigations are intentionally left alone: those are
  * handled by Layer 2, which redirects them to the interstitial "speed bump"
- * rather than silently failing the load. Distractions are always blocked here
- * regardless of focus state (the focus-mode "allow only approved" restriction is
- * a navigation-level concept, applying it to sub-resources would break pages).
+ * rather than silently failing the load.
+ *
+ * Only *cross-site* distraction requests are cancelled — a reddit embed on a work
+ * page is blocked, but reddit's own resources when you're actually on reddit
+ * (having passed the interstitial / Continue Anyway) are allowed, so the page
+ * isn't broken. Focus-mode's "allow only approved" is a navigation-level concept
+ * enforced by Layer 2; applying it to sub-resources would break legitimate pages.
  */
 export class NetworkBlocker {
   constructor(
@@ -25,8 +29,19 @@ export class NetworkBlocker {
         callback({})
         return
       }
-      const blocked = roleForUrl(details.url, this.workspaceId) === 'distraction'
-      callback({ cancel: blocked })
+      if (roleForUrl(details.url, this.workspaceId) !== 'distraction') {
+        callback({})
+        return
+      }
+      // Distraction sub-resource: allow if first-party (top page is this same
+      // site), block if it's a cross-site embed.
+      let topUrl = ''
+      try {
+        topUrl = details.frame?.top?.url ?? ''
+      } catch {
+        topUrl = ''
+      }
+      callback({ cancel: !sameSite(topUrl, details.url) })
     })
   }
 
