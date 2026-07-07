@@ -2,6 +2,9 @@ import type { BaseWindow, Rectangle } from 'electron'
 import { TabManager } from './TabManager'
 import { DownloadManager } from './DownloadManager'
 import { PermissionManager } from './PermissionManager'
+import { NetworkBlocker } from './NetworkBlocker'
+import { decideNavigation } from './blocking'
+import { logOverride } from './history'
 import type { Workspace } from '../shared/types'
 
 /**
@@ -15,6 +18,7 @@ export class WorkspaceView {
   readonly tabs: TabManager
   readonly downloads: DownloadManager
   readonly permissions: PermissionManager
+  readonly blocker: NetworkBlocker
 
   constructor(
     window: BaseWindow,
@@ -25,9 +29,21 @@ export class WorkspaceView {
   ) {
     this.downloads = new DownloadManager(workspace.partition, onChange)
     this.permissions = new PermissionManager(workspace.partition, onChange)
-    this.tabs = new TabManager(window, onChange, initialRegion, workspace.partition, onNavigate)
+    this.blocker = new NetworkBlocker(workspace.partition, workspace.id)
+    // Layer 2 decision: focus state is 'idle' until Phase 5's FocusManager.
+    const decide = (url: string): 'allow' | 'block' => decideNavigation(url, workspace.id, 'idle')
+    this.tabs = new TabManager(
+      window,
+      onChange,
+      initialRegion,
+      workspace.partition,
+      onNavigate,
+      decide,
+      (url) => logOverride(url, workspace.id)
+    )
     this.downloads.attach()
     this.permissions.attach()
+    this.blocker.attach()
   }
 
   hide(): void {
@@ -41,6 +57,7 @@ export class WorkspaceView {
   destroy(): void {
     this.downloads.detach()
     this.permissions.detach()
+    this.blocker.detach()
     this.tabs.destroy()
   }
 }

@@ -30,6 +30,17 @@ export interface Workspace {
   pinnedSites: string[]
 }
 
+/**
+ * Website role lists — patterns (hostnames or host+path prefixes) classifying
+ * what each site is. Drives the blocking engine. Held globally with per-workspace
+ * overrides.
+ */
+export interface RolesConfig {
+  essential: string[]
+  reference: string[]
+  distractions: string[]
+}
+
 /** The renderer-facing subset of a Workspace, used to render the switcher. */
 export interface WorkspaceSummary {
   id: string
@@ -73,6 +84,10 @@ export interface BrowserState {
   pinnedSites: string[]
   /** When true, show the "what are you working on?" picker instead of the browser. */
   showPicker: boolean
+  /** When true, show the full-window settings (roles management) screen. */
+  showSettings: boolean
+  /** Global website roles, shown/edited in the settings screen. */
+  roles: RolesConfig
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -99,6 +114,10 @@ export type Command =
   | 'workspace:start'
   | 'workspace:pin'
   | 'workspace:unpin'
+  | 'settings:open'
+  | 'settings:close'
+  | 'roles:add'
+  | 'roles:remove'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

@@ -4,6 +4,7 @@ import { join } from 'path'
 
 let db: Database.Database | null = null
 let insertVisit: Database.Statement | null = null
+let insertOverride: Database.Statement | null = null
 
 /**
  * Open the history database and ensure its schema exists. Call after app ready.
@@ -25,14 +26,26 @@ export function initHistory(): void {
         visited_at   INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_history_visited_at ON history (visited_at);
+
+      CREATE TABLE IF NOT EXISTS overrides (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        url           TEXT    NOT NULL,
+        workspace_id  TEXT,
+        overridden_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_overrides_at ON overrides (overridden_at);
     `)
     insertVisit = db.prepare(
       'INSERT INTO history (url, title, workspace_id, visited_at) VALUES (?, ?, ?, ?)'
+    )
+    insertOverride = db.prepare(
+      'INSERT INTO overrides (url, workspace_id, overridden_at) VALUES (?, ?, ?)'
     )
   } catch (err) {
     console.error('[history] initialization failed; history logging disabled:', err)
     db = null
     insertVisit = null
+    insertOverride = null
   }
 }
 
@@ -45,8 +58,15 @@ export function logVisit(url: string, title: string, workspaceId: string | null)
   insertVisit.run(url, title || null, workspaceId, Date.now())
 }
 
+/** Log a "Continue Anyway" override past the blocking interstitial. */
+export function logOverride(url: string, workspaceId: string | null): void {
+  if (!insertOverride || !url) return
+  insertOverride.run(url, workspaceId, Date.now())
+}
+
 export function closeHistory(): void {
   db?.close()
   db = null
   insertVisit = null
+  insertOverride = null
 }
