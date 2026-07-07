@@ -175,8 +175,13 @@ function topOrigins(urls: string[], limit: number): { origin: string; visits: nu
     .slice(0, limit)
 }
 
-/** Snapshot the day's stats for the new-tab dashboard. Empty when db is down. */
-export function getDashboardStats(): DashboardStats {
+/**
+ * Snapshot the day's stats for one workspace's new-tab dashboard. Every query
+ * filters by workspace_id so each workspace sees only its own numbers — the same
+ * isolation the per-workspace partitions and history give the rest of the app.
+ * Empty when db is down.
+ */
+export function getDashboardStats(workspaceId: string): DashboardStats {
   const empty: DashboardStats = {
     sessionsToday: 0,
     focusedMinutesToday: 0,
@@ -190,21 +195,23 @@ export function getDashboardStats(): DashboardStats {
   const sess = db
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(ended_at - started_at), 0) AS ms
-       FROM sessions WHERE completed = 1 AND started_at >= ?`
+       FROM sessions WHERE completed = 1 AND workspace_id = ? AND started_at >= ?`
     )
-    .get(dayStart) as { n: number; ms: number }
+    .get(workspaceId, dayStart) as { n: number; ms: number }
 
   const blocked = db
-    .prepare(`SELECT COUNT(*) AS n FROM blocks WHERE blocked_at >= ?`)
-    .get(dayStart) as { n: number }
+    .prepare(`SELECT COUNT(*) AS n FROM blocks WHERE workspace_id = ? AND blocked_at >= ?`)
+    .get(workspaceId, dayStart) as { n: number }
 
-  const visits = db.prepare(`SELECT url FROM history WHERE visited_at >= ?`).all(dayStart) as {
-    url: string
-  }[]
+  const visits = db
+    .prepare(`SELECT url FROM history WHERE workspace_id = ? AND visited_at >= ?`)
+    .all(workspaceId, dayStart) as { url: string }[]
 
   const completed = db
-    .prepare(`SELECT started_at FROM sessions WHERE completed = 1 ORDER BY started_at DESC`)
-    .all() as { started_at: number }[]
+    .prepare(
+      `SELECT started_at FROM sessions WHERE completed = 1 AND workspace_id = ? ORDER BY started_at DESC`
+    )
+    .all(workspaceId) as { started_at: number }[]
 
   return {
     sessionsToday: sess.n,

@@ -58,7 +58,8 @@ export function computePaletteResults(query: string, ctx: PaletteContext): Palet
   }
 
   // `new <workspace> session` — switch to a workspace and start a focus session.
-  const session = q.match(/^new\s+(.+?)(?:\s+session)?$/)
+  // The `session` suffix is required so `new tab` / `new note` don't land here.
+  const session = q.match(/^new\s+(.+?)\s+session$/)
   if (session) {
     const nameQ = session[1].trim()
     for (const w of ctx.workspaces) {

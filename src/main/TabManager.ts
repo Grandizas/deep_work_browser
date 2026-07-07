@@ -100,18 +100,22 @@ export class TabManager {
   }
 
   // Load a URL into a tab, routing blocked distractions to the interstitial.
-  // A blank target loads the internal new-tab dashboard instead.
+  // A blank target (empty or about:blank — the latter is how a persisted home
+  // tab round-trips) loads the internal new-tab dashboard instead.
   private loadInTab(tab: Tab, url: string, check: boolean): void {
+    // Was this exact URL already the one being blocked? Then this is a reload of
+    // the interstitial, not a fresh attempt — don't double-count the block.
+    const reblockingSame = tab.blockedUrl === url
     tab.errorUrl = null
     tab.blockedUrl = null
     tab.overrideSite = null
     tab.isHome = false
-    if (url === 'about:blank') {
+    if (!url || url === 'about:blank') {
       tab.isHome = true
       tab.view.webContents.loadURL(this.homePage())
     } else if (check && this.decide(url) === 'block') {
       tab.blockedUrl = url
-      this.onBlock(url)
+      if (!reblockingSame) this.onBlock(url)
       tab.view.webContents.loadURL(interstitialUrl(url))
     } else {
       tab.view.webContents.loadURL(url)

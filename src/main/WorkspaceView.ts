@@ -46,7 +46,7 @@ export class WorkspaceView {
       decide,
       (url) => logOverride(url, workspace.id),
       (url) => logBlock(url, workspace.id),
-      () => dashboardDataUrl(getDashboardStats())
+      () => dashboardDataUrl(getDashboardStats(workspace.id))
     )
     this.downloads.attach()
     this.permissions.attach()
