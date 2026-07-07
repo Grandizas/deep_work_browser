@@ -26,6 +26,9 @@ interface Tab {
   // override, so its own redirects/navigations aren't re-blocked. Cleared when
   // navigating to a different site.
   overrideSite: string | null
+  // True while showing the internal new-tab dashboard (a baked data URL). The
+  // address bar shows empty for these so a new tab is ready to type into.
+  isHome: boolean
 }
 
 let tabSeq = 0
@@ -54,7 +57,11 @@ export class TabManager {
     // Blocking decision for a candidate navigation (workspace + focus aware).
     private readonly decide: (url: string) => 'allow' | 'block',
     // Called when the user chooses "Continue Anyway" past the interstitial.
-    private readonly onOverride: (url: string) => void
+    private readonly onOverride: (url: string) => void,
+    // Called when a top-level navigation is blocked (interstitial shown).
+    private readonly onBlock: (url: string) => void,
+    // Builds the internal new-tab page (dashboard) as a data URL, on demand.
+    private readonly homePage: () => string
   ) {}
 
   private get active(): Tab | undefined {
@@ -81,7 +88,8 @@ export class TabManager {
       favicon: null,
       errorUrl: null,
       blockedUrl: null,
-      overrideSite: null
+      overrideSite: null,
+      isHome: false
     }
     this.tabs.push(tab)
     this.window.contentView.addChildView(view)
@@ -92,12 +100,22 @@ export class TabManager {
   }
 
   // Load a URL into a tab, routing blocked distractions to the interstitial.
+  // A blank target (empty or about:blank — the latter is how a persisted home
+  // tab round-trips) loads the internal new-tab dashboard instead.
   private loadInTab(tab: Tab, url: string, check: boolean): void {
+    // Was this exact URL already the one being blocked? Then this is a reload of
+    // the interstitial, not a fresh attempt — don't double-count the block.
+    const reblockingSame = tab.blockedUrl === url
     tab.errorUrl = null
     tab.blockedUrl = null
     tab.overrideSite = null
-    if (check && this.decide(url) === 'block') {
+    tab.isHome = false
+    if (!url || url === 'about:blank') {
+      tab.isHome = true
+      tab.view.webContents.loadURL(this.homePage())
+    } else if (check && this.decide(url) === 'block') {
       tab.blockedUrl = url
+      if (!reblockingSame) this.onBlock(url)
       tab.view.webContents.loadURL(interstitialUrl(url))
     } else {
       tab.view.webContents.loadURL(url)
@@ -158,6 +176,7 @@ export class TabManager {
         event.preventDefault()
         tab.overrideSite = null
         tab.blockedUrl = url
+        this.onBlock(url)
         wc.loadURL(interstitialUrl(url))
       } else {
         // Navigated to a different allowed site — the override no longer applies.
@@ -295,6 +314,9 @@ export class TabManager {
     // On the interstitial, reload re-checks the blocked URL (still blocked → stays).
     if (tab.blockedUrl) {
       this.loadInTab(tab, tab.blockedUrl, true)
+    } else if (tab.isHome) {
+      // Refresh the dashboard with a current snapshot rather than the stale one.
+      this.loadInTab(tab, 'about:blank', false)
     } else if (tab.errorUrl) {
       // On an error page, reload retries the URL that failed, not the data URL.
       const retry = tab.errorUrl
@@ -340,7 +362,7 @@ export class TabManager {
         const dead = wc.isDestroyed()
         return {
           id: tab.id,
-          url: tab.blockedUrl ?? tab.errorUrl ?? (dead ? '' : wc.getURL()),
+          url: tab.isHome ? '' : (tab.blockedUrl ?? tab.errorUrl ?? (dead ? '' : wc.getURL())),
           title: dead ? '' : wc.getTitle(),
           favicon: tab.favicon,
           isLoading: dead ? false : wc.isLoading(),

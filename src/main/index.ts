@@ -249,6 +249,12 @@ function createWindow(): void {
     const eff = roles.getEffective(activeId)
     focus.startFocus(activeId, minutes * 60_000, [...eff.essential, ...eff.reference])
   }
+  // Palette `new <workspace> session`: switch into the workspace first, then
+  // start a focus session there (the allowlist is snapshotted from the target).
+  const startWorkspaceSession = (id: string, minutes: number): void => {
+    switchWorkspace(id)
+    startFocusSession(minutes)
+  }
   const showFocusMenu = (): void => {
     const menu = Menu.buildFromTemplate(
       FOCUS_PRESETS.map((min) => ({
@@ -479,6 +485,11 @@ function createWindow(): void {
         break
       case 'workspace:switch':
         if (typeof payload.id === 'string') switchWorkspace(payload.id)
+        break
+      case 'workspace:session':
+        if (typeof payload.id === 'string' && typeof payload.minutes === 'number') {
+          startWorkspaceSession(payload.id, payload.minutes)
+        }
         break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)

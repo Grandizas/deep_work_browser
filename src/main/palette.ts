@@ -57,9 +57,29 @@ export function computePaletteResults(query: string, ctx: PaletteContext): Palet
     })
   }
 
+  // `new <workspace> session` — switch to a workspace and start a focus session.
+  // The `session` suffix is required so `new tab` / `new note` don't land here.
+  const session = q.match(/^new\s+(.+?)\s+session$/)
+  if (session) {
+    const nameQ = session[1].trim()
+    for (const w of ctx.workspaces) {
+      if (fuzzyMatch(nameQ, w.name.toLowerCase())) {
+        out.push({
+          id: `session-${w.id}`,
+          icon: w.emoji,
+          title: `New ${w.name} session`,
+          subtitle: 'Switch + start a 25-minute focus session',
+          cmd: 'workspace:session',
+          payload: { id: w.id, minutes: 25 }
+        })
+      }
+    }
+  }
+
   // --- Static commands ---
   const statics: PaletteResult[] = [
     { id: 'new-tab', icon: '➕', title: 'New tab', cmd: 'tab:new' },
+    { id: 'today', icon: '📊', title: 'Today', subtitle: 'Open the dashboard', cmd: 'tab:new' },
     {
       id: 'focus-25',
       icon: '⏱',

@@ -105,7 +105,7 @@ Goal: never touch menus.
 - [x] Ctrl+K overlay in the chrome renderer (this is pure Vue work — your comfort zone)
 - [x] Command registry: static commands + parameterized (`timer 30`, `block youtube`) + fuzzy site jump (searches history + roles + open tabs)
 - [x] Commands dispatch through the same IPC `cmd:*` channel — the palette is just another caller
-- [ ] Minimum command set: `timer <min>`, `new <workspace> session`, `block <site>`, `notes`, `today` (dashboard), workspace names, open-tab switching, history search
+- [x] Minimum command set: `timer <min>`, `new <workspace> session`, `block <site>`, `today` (dashboard), workspace names, open-tab switching, history search — (`notes` deferred to Phase 8; gets its palette command when that feature lands)
 
 Done when: you stop using the mouse for navigation.
 
@@ -113,10 +113,10 @@ Done when: you stop using the mouse for navigation.
 
 Goal: open a new tab, see your day.
 
-- [ ] New tab = internal page rendered by your chrome renderer (route) or a dedicated local page
-- [ ] Queries SQLite: sessions completed today, focused minutes, streak (consecutive days with ≥1 completed session), top visited sites, distractions blocked count
-- [ ] Keep it to one screen, no charts by default (per your philosophy) — a single "show details" expander max
-- [ ] Streak logic careful with timezones; compute from local dates
+- [x] New tab = internal page rendered by your chrome renderer (route) or a dedicated local page
+- [x] Queries SQLite: sessions completed today, focused minutes, streak (consecutive days with ≥1 completed session), top visited sites, distractions blocked count
+- [x] Keep it to one screen, no charts by default (per your philosophy) — a single "show details" expander max
+- [x] Streak logic careful with timezones; compute from local dates
 
 Done when: the dashboard replaces any urge for a separate stats app.
 

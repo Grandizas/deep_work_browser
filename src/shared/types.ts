@@ -30,6 +30,16 @@ export interface Workspace {
   pinnedSites: string[]
 }
 
+/** Daily dashboard stats, computed in main from SQLite for the new-tab page. */
+export interface DashboardStats {
+  sessionsToday: number
+  focusedMinutesToday: number
+  /** Consecutive local days (up to today) with ≥1 completed session. */
+  streak: number
+  topSites: { origin: string; visits: number }[]
+  blockedToday: number
+}
+
 /** A command-palette result row. Selecting it dispatches `cmd` with `payload`. */
 export interface PaletteResult {
   id: string
@@ -159,6 +169,7 @@ export type Command =
   | 'focus:control'
   | 'focus:dismiss'
   | 'workspace:switch'
+  | 'workspace:session'
   | 'palette:close'
   | 'palette:query'
 
