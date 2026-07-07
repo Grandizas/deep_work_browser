@@ -516,8 +516,11 @@ app.whenReady().then(() => {
   roles.init()
   // Log every finished focus session to SQLite (app-level, not per-window).
   focus.onSessionEnd = (s) => logSession(s.workspaceId, s.startedAt, s.endedAt, s.completed)
-  // Resume a focus session that was running when the app last closed/crashed.
+  // Resume a focus session that was running when the app last closed/crashed,
+  // then re-persist: a session that elapsed offline is logged once and reset to
+  // idle here, so it isn't re-logged on the next launch.
   focus.restore(settings.getFocusState())
+  settings.setFocusState(focus.serialize())
   installAppMenu(() => activeActions)
 
   createWindow()

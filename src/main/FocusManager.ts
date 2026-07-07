@@ -165,7 +165,27 @@ class FocusManager {
    */
   restore(data: FocusPersisted): void {
     if (data.phase === 'idle') return
-    if (!data.paused && (data.endsAt === null || data.endsAt <= Date.now())) return
+
+    // The session's timer already elapsed while the app was closed.
+    if (!data.paused && (data.endsAt === null || data.endsAt <= Date.now())) {
+      // A focus session that fully ran offline still counts as completed — log
+      // it rather than silently dropping it. (A stale completion/break screen
+      // would make no sense long after the fact, so we don't resurface it.)
+      if (
+        data.phase === 'focus' &&
+        data.workspaceId &&
+        data.startedAt !== null &&
+        data.endsAt !== null
+      ) {
+        this.onSessionEnd?.({
+          workspaceId: data.workspaceId,
+          startedAt: data.startedAt,
+          endedAt: data.endsAt,
+          completed: true
+        })
+      }
+      return
+    }
 
     this.phase = data.phase
     this.workspaceId = data.workspaceId
