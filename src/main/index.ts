@@ -10,7 +10,8 @@ import { initHistory, logVisit, closeHistory, logSession } from './history'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
-import type { WorkspaceSummary, RolesConfig } from '../shared/types'
+import { computePaletteResults } from './palette'
+import type { WorkspaceSummary, RolesConfig, PaletteResult } from '../shared/types'
 
 const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
 
@@ -72,6 +73,9 @@ function createWindow(): void {
   let showSettings = false
   // Full-window focus-complete / break celebration screen.
   let showCompletion = false
+  // Ctrl+K command palette overlay (full-window, hides tabs while open).
+  let showPalette = false
+  let paletteResults: PaletteResult[] = []
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -114,6 +118,8 @@ function createWindow(): void {
       roles: roles.getGlobal(),
       focus: focus.snapshot(),
       showCompletion,
+      showPalette,
+      paletteResults,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -322,7 +328,7 @@ function createWindow(): void {
   // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showPicker || showSettings || showCompletion) {
+    if (showPicker || showSettings || showCompletion || showPalette) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -362,6 +368,40 @@ function createWindow(): void {
     pushState()
   }
 
+  // Command palette (Ctrl+K): full-window overlay, tabs hidden while open.
+  const openPalette = (): void => {
+    if (showPalette || showPicker || showSettings || showCompletion) return
+    showPalette = true
+    activeView()?.hide()
+    chromeView.webContents.focus()
+    layoutViews()
+    pushState()
+  }
+  const closePalette = (): void => {
+    if (!showPalette) return
+    showPalette = false
+    paletteResults = []
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+  const togglePalette = (): void => {
+    if (showPalette) closePalette()
+    else openPalette()
+  }
+  const runPaletteQuery = (query: string): void => {
+    const view = activeView()
+    const tabsState = view ? view.tabs.getState() : { tabs: [], activeTabId: null }
+    paletteResults = computePaletteResults(query, {
+      tabs: tabsState.tabs,
+      activeTabId: tabsState.activeTabId,
+      workspaces: workspaceSummaries(),
+      activeWorkspaceId: activeId,
+      roles: roles.getEffective(activeId)
+    })
+    pushState()
+  }
+
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -373,6 +413,8 @@ function createWindow(): void {
       granted?: boolean
       role?: string
       pattern?: string
+      minutes?: number
+      query?: string
     }
 
     switch (message.cmd) {
@@ -426,6 +468,18 @@ function createWindow(): void {
       case 'focus:dismiss':
         closeCompletion()
         break
+      case 'palette:close':
+        closePalette()
+        break
+      case 'palette:query':
+        if (typeof payload.query === 'string') runPaletteQuery(payload.query)
+        break
+      case 'focus:start':
+        if (typeof payload.minutes === 'number') startFocusSession(payload.minutes)
+        break
+      case 'workspace:switch':
+        if (typeof payload.id === 'string') switchWorkspace(payload.id)
+        break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)
         break
@@ -464,7 +518,8 @@ function createWindow(): void {
     focusUrlBar,
     nextTab: () => activeView()?.tabs.activateAdjacent(1),
     prevTab: () => activeView()?.tabs.activateAdjacent(-1),
-    reload: () => activeView()?.tabs.reload()
+    reload: () => activeView()?.tabs.reload(),
+    togglePalette
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'

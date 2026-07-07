@@ -78,6 +78,22 @@ export function logVisit(url: string, title: string, workspaceId: string | null)
   insertVisit.run(url, title || null, workspaceId, Date.now())
 }
 
+/** Recent distinct history entries whose url or title matches `query`. */
+export function searchHistory(
+  query: string,
+  limit: number
+): { url: string; title: string | null }[] {
+  if (!db || !query) return []
+  const like = `%${query}%`
+  return db
+    .prepare(
+      `SELECT url, title, MAX(visited_at) AS v FROM history
+       WHERE url LIKE ? OR title LIKE ?
+       GROUP BY url ORDER BY v DESC LIMIT ?`
+    )
+    .all(like, like, limit) as { url: string; title: string | null }[]
+}
+
 /** Log a "Continue Anyway" override past the blocking interstitial. */
 export function logOverride(url: string, workspaceId: string | null): void {
   if (!insertOverride || !url) return

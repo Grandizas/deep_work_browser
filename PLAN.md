@@ -102,9 +102,9 @@ Done when: a full 50-min session works end to end, and stats are being recorded.
 
 Goal: never touch menus.
 
-- [ ] Ctrl+K overlay in the chrome renderer (this is pure Vue work — your comfort zone)
-- [ ] Command registry: static commands + parameterized (`timer 30`, `block youtube`) + fuzzy site jump (searches history + roles + open tabs)
-- [ ] Commands dispatch through the same IPC `cmd:*` channel — the palette is just another caller
+- [x] Ctrl+K overlay in the chrome renderer (this is pure Vue work — your comfort zone)
+- [x] Command registry: static commands + parameterized (`timer 30`, `block youtube`) + fuzzy site jump (searches history + roles + open tabs)
+- [x] Commands dispatch through the same IPC `cmd:*` channel — the palette is just another caller
 - [ ] Minimum command set: `timer <min>`, `new <workspace> session`, `block <site>`, `notes`, `today` (dashboard), workspace names, open-tab switching, history search
 
 Done when: you stop using the mouse for navigation.
