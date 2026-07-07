@@ -70,6 +70,8 @@ function createWindow(): void {
   let showPicker = true
   // Full-window settings screen (hides the active tabs while open).
   let showSettings = false
+  // Full-window focus-complete / break celebration screen.
+  let showCompletion = false
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -111,6 +113,7 @@ function createWindow(): void {
       showSettings,
       roles: roles.getGlobal(),
       focus: focus.snapshot(),
+      showCompletion,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -306,7 +309,7 @@ function createWindow(): void {
   // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showPicker || showSettings) {
+    if (showPicker || showSettings || showCompletion) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -321,7 +324,29 @@ function createWindow(): void {
   mainWindow.on('unmaximize', persistWindow)
 
   // The focus timer lives in main; reflect its phase changes to this window.
-  focus.onChange = pushState
+  // When a break elapses back to idle, dismiss the completion screen too.
+  focus.onChange = () => {
+    if (showCompletion && focus.snapshot().state === 'idle') {
+      showCompletion = false
+      layoutViews()
+      activeView()?.show(contentRegion())
+    }
+    pushState()
+  }
+  // A finished focus session shows the full-window 🎉 celebration (tabs hidden).
+  focus.onComplete = () => {
+    activeView()?.hide()
+    showCompletion = true
+    layoutViews()
+    pushState()
+  }
+  const closeCompletion = (): void => {
+    if (!showCompletion) return
+    showCompletion = false
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
 
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
@@ -381,6 +406,9 @@ function createWindow(): void {
       case 'focus:menu':
         showFocusMenu()
         break
+      case 'focus:dismiss':
+        closeCompletion()
+        break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)
         break
@@ -438,7 +466,8 @@ function createWindow(): void {
     workspaceViews.clear()
     if (!chromeView.webContents.isDestroyed()) chromeView.webContents.close()
     if (activeActions?.newTab === newTab) activeActions = null
-    if (focus.onChange === pushState) focus.onChange = null
+    focus.onChange = null
+    focus.onComplete = null
   })
 
   chromeView.webContents.once('did-finish-load', () => {

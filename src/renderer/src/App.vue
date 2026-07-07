@@ -8,6 +8,7 @@ import Downloads from './components/Downloads.vue'
 import PermissionPrompt from './components/PermissionPrompt.vue'
 import WorkspacePicker from './components/WorkspacePicker.vue'
 import Settings from './components/Settings.vue'
+import CompletionScreen from './components/CompletionScreen.vue'
 
 const store = useBrowserStore()
 
@@ -29,6 +30,7 @@ onUnmounted(() => unsubscribe?.())
 <template>
   <WorkspacePicker v-if="store.showPicker" />
   <Settings v-else-if="store.showSettings" />
+  <CompletionScreen v-else-if="store.showCompletion" />
   <div v-else id="chrome" :style="{ '--accent': accent }">
     <TabBar />
     <Toolbar />

@@ -1,5 +1,8 @@
 import type { FocusPhase, FocusSnapshot } from '../shared/types'
 
+// Break length after a completed focus session (everything unlocked).
+const BREAK_MS = 5 * 60 * 1000
+
 /**
  * The focus-session state machine, owned by the main process so the timer
  * survives renderer reloads. Holds one session at a time:
@@ -18,6 +21,8 @@ class FocusManager {
 
   /** Called on every phase transition (start / end / expiry). */
   onChange: (() => void) | null = null
+  /** Called when a focus session finishes and auto-rolls into a break. */
+  onComplete: (() => void) | null = null
 
   /** Start a focus session for a workspace, allowing only `allowlist` sites. */
   startFocus(workspaceId: string, durationMs: number, allowlist: string[]): void {
@@ -77,9 +82,15 @@ class FocusManager {
   }
 
   private onExpire(): void {
-    // A finished focus session auto-starting a break is a later checkbox; for
-    // now any elapsed session returns to idle.
-    this.end()
+    if (this.phase === 'focus') {
+      // Focus complete → auto-roll into a break (everything unlocked), and fire
+      // the completion celebration.
+      this.startBreak(BREAK_MS)
+      this.onComplete?.()
+    } else {
+      // A break elapsed → back to idle.
+      this.end()
+    }
   }
 
   private emit(): void {

@@ -92,7 +92,7 @@ Goal: 50-minute sessions that actually change browser behavior.
 - [x] Start session UI: duration presets (25/50/90), uses current workspace's Essential+Reference sites as allowlist
 - [x] During focus: blocking engine switches from "block distractions" to "allow only approved" mode
 - [x] Timer display in chrome UI (subtle, always visible)
-- [ ] Session end: 🎉 completion screen, auto-start break mode (everything unlocked), break countdown
+- [x] Session end: 🎉 completion screen, auto-start break mode (everything unlocked), break countdown
 - [ ] Pause/resume; persist timer state so a crash/restart restores it (feeds Session Restore later)
 - [ ] Log sessions to SQLite: `{start, end, workspaceId, completed, overrides}`
 

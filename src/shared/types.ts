@@ -104,6 +104,8 @@ export interface BrowserState {
   roles: RolesConfig
   /** Current focus-session state (timer lives in main). */
   focus: FocusSnapshot
+  /** When true, show the full-window 🎉 focus-complete / break screen. */
+  showCompletion: boolean
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -135,6 +137,7 @@ export type Command =
   | 'roles:add'
   | 'roles:remove'
   | 'focus:menu'
+  | 'focus:dismiss'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {
