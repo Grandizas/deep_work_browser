@@ -110,6 +110,8 @@ export interface BrowserState {
   focus: FocusSnapshot
   /** When true, show the full-window 🎉 focus-complete / break screen. */
   showCompletion: boolean
+  /** When true, show the Ctrl+K command palette overlay. */
+  showPalette: boolean
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -143,6 +145,7 @@ export type Command =
   | 'focus:menu'
   | 'focus:control'
   | 'focus:dismiss'
+  | 'palette:close'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

@@ -8,6 +8,7 @@ export interface MenuActions {
   nextTab(): void
   prevTab(): void
   reload(): void
+  togglePalette(): void
 }
 
 /**
@@ -34,6 +35,12 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
     {
       label: 'View',
       submenu: [
+        {
+          label: 'Command Palette',
+          accelerator: 'CmdOrCtrl+K',
+          click: run((a) => a.togglePalette())
+        },
+        { type: 'separator' },
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: run((a) => a.reload()) },
         {
           label: 'Focus Address Bar',

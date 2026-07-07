@@ -72,6 +72,8 @@ function createWindow(): void {
   let showSettings = false
   // Full-window focus-complete / break celebration screen.
   let showCompletion = false
+  // Ctrl+K command palette overlay (full-window, hides tabs while open).
+  let showPalette = false
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -114,6 +116,7 @@ function createWindow(): void {
       roles: roles.getGlobal(),
       focus: focus.snapshot(),
       showCompletion,
+      showPalette,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -322,7 +325,7 @@ function createWindow(): void {
   // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showPicker || showSettings || showCompletion) {
+    if (showPicker || showSettings || showCompletion || showPalette) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -360,6 +363,27 @@ function createWindow(): void {
     layoutViews()
     activeView()?.show(contentRegion())
     pushState()
+  }
+
+  // Command palette (Ctrl+K): full-window overlay, tabs hidden while open.
+  const openPalette = (): void => {
+    if (showPalette || showPicker || showSettings || showCompletion) return
+    showPalette = true
+    activeView()?.hide()
+    chromeView.webContents.focus()
+    layoutViews()
+    pushState()
+  }
+  const closePalette = (): void => {
+    if (!showPalette) return
+    showPalette = false
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+  const togglePalette = (): void => {
+    if (showPalette) closePalette()
+    else openPalette()
   }
 
   // Commands: renderer → main. Reject anything not sent by our chrome view —
@@ -426,6 +450,9 @@ function createWindow(): void {
       case 'focus:dismiss':
         closeCompletion()
         break
+      case 'palette:close':
+        closePalette()
+        break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)
         break
@@ -464,7 +491,8 @@ function createWindow(): void {
     focusUrlBar,
     nextTab: () => activeView()?.tabs.activateAdjacent(1),
     prevTab: () => activeView()?.tabs.activateAdjacent(-1),
-    reload: () => activeView()?.tabs.reload()
+    reload: () => activeView()?.tabs.reload(),
+    togglePalette
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'
