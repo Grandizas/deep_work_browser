@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { useBrowserStore } from '../stores/browser'
+import FocusControl from './FocusControl.vue'
 
 const store = useBrowserStore()
 const urlInput = ref<HTMLInputElement | null>(null)
@@ -98,6 +99,7 @@ function onEnter(): void {
     >
       ⚙
     </button>
+    <FocusControl />
   </div>
 </template>
 

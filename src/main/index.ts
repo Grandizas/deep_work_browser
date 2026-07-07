@@ -233,6 +233,23 @@ function createWindow(): void {
     pushState()
   }
 
+  // Start-focus presets (minutes). A session's allowlist is the current
+  // workspace's Essential + Reference sites, snapshotted at start.
+  const FOCUS_PRESETS = [25, 50, 90]
+  const startFocusSession = (minutes: number): void => {
+    const eff = roles.getEffective(activeId)
+    focus.startFocus(activeId, minutes * 60_000, [...eff.essential, ...eff.reference])
+  }
+  const showFocusMenu = (): void => {
+    const menu = Menu.buildFromTemplate(
+      FOCUS_PRESETS.map((min) => ({
+        label: `${min} minutes`,
+        click: () => startFocusSession(min)
+      }))
+    )
+    menu.popup({ window: mainWindow })
+  }
+
   // Pin / unpin a site in the active workspace's bookmarks row.
   const pinSite = (url: string): void => {
     const ws = workspaces.get(activeId)
@@ -360,6 +377,9 @@ function createWindow(): void {
         break
       case 'workspace:menu':
         showWorkspaceMenu()
+        break
+      case 'focus:menu':
+        showFocusMenu()
         break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)

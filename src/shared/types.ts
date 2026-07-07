@@ -134,6 +134,7 @@ export type Command =
   | 'settings:close'
   | 'roles:add'
   | 'roles:remove'
+  | 'focus:menu'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

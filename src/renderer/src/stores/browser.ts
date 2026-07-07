@@ -84,6 +84,9 @@ export const useBrowserStore = defineStore('browser', {
     openWorkspaceMenu(): void {
       send('workspace:menu')
     },
+    openFocusMenu(): void {
+      send('focus:menu')
+    },
     startWorkspace(id: string): void {
       send('workspace:start', { id })
     },
