@@ -1,12 +1,39 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useBrowserStore } from '../stores/browser'
 
 const store = useBrowserStore()
 const query = ref('')
 const input = ref<HTMLInputElement | null>(null)
+const selected = ref(0)
 
-onMounted(() => input.value?.focus())
+const results = computed(() => store.paletteResults)
+
+onMounted(() => {
+  input.value?.focus()
+  store.queryPalette('')
+})
+
+// Ask main to recompute on each keystroke; reset the highlight.
+watch(query, (q) => {
+  selected.value = 0
+  store.queryPalette(q)
+})
+
+// Keep the highlight in range as results change.
+watch(results, (r) => {
+  if (selected.value >= r.length) selected.value = Math.max(0, r.length - 1)
+})
+
+function move(delta: number): void {
+  const n = results.value.length
+  if (n === 0) return
+  selected.value = (selected.value + delta + n) % n
+}
+function run(index: number): void {
+  const r = results.value[index]
+  if (r) store.runResult(r)
+}
 </script>
 
 <template>
@@ -21,10 +48,27 @@ onMounted(() => input.value?.focus())
         autocomplete="off"
         placeholder="Type a command or search…"
         @keydown.esc="store.closePalette()"
+        @keydown.down.prevent="move(1)"
+        @keydown.up.prevent="move(-1)"
+        @keydown.enter.prevent="run(selected)"
       />
-      <div class="results">
-        <p class="hint">Commands coming soon…</p>
-      </div>
+      <ul v-if="results.length" class="results">
+        <li
+          v-for="(r, i) in results"
+          :key="r.id"
+          class="result"
+          :class="{ active: i === selected }"
+          @click="run(i)"
+          @mousemove="selected = i"
+        >
+          <span class="icon">{{ r.icon }}</span>
+          <span class="text">
+            <span class="title">{{ r.title }}</span>
+            <span v-if="r.subtitle" class="subtitle">{{ r.subtitle }}</span>
+          </span>
+        </li>
+      </ul>
+      <p v-else class="empty">No matches</p>
     </div>
   </div>
 </template>
@@ -62,16 +106,53 @@ onMounted(() => input.value?.focus())
 }
 
 .results {
-  min-height: 80px;
-  max-height: 50vh;
+  max-height: 52vh;
   overflow-y: auto;
   border-top: 1px solid var(--ev-c-gray-3);
-  padding: 8px;
+  padding: 6px;
 }
-.hint {
-  padding: 16px;
+.result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: default;
+}
+.result.active {
+  background: color-mix(in srgb, var(--accent, #4f8cff) 20%, transparent);
+}
+.icon {
+  width: 20px;
+  text-align: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.title {
+  font-size: 13px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subtitle {
+  font-size: 11px;
+  color: var(--ev-c-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 20px;
   font-size: 13px;
   color: var(--ev-c-text-3);
   text-align: center;
+  border-top: 1px solid var(--ev-c-gray-3);
 }
 </style>

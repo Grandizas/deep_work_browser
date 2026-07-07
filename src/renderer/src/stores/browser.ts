@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
-import type { BrowserState, Command } from '../../../shared/types'
+import type { BrowserState, Command, PaletteResult } from '../../../shared/types'
 
 function send(cmd: Command, payload?: unknown): void {
-  window.api.send(cmd, payload)
+  // Payloads pulled from store state are Vue reactive Proxies, which Electron's
+  // structured clone (at the contextBridge / ipcRenderer boundary) can't
+  // serialize — it throws DataCloneError. Strip reactivity to a plain object.
+  window.api.send(cmd, payload === undefined ? undefined : JSON.parse(JSON.stringify(payload)))
 }
 
 // A dumb mirror of the main process's authoritative BrowserState, plus a thin
@@ -23,6 +26,7 @@ export const useBrowserStore = defineStore('browser', {
     focus: { state: 'idle', endsAt: null, workspaceId: null, paused: false, remainingMs: 0 },
     showCompletion: false,
     showPalette: false,
+    paletteResults: [] as PaletteResult[],
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -50,6 +54,7 @@ export const useBrowserStore = defineStore('browser', {
       this.focus = next.focus
       this.showCompletion = next.showCompletion
       this.showPalette = next.showPalette
+      this.paletteResults = next.paletteResults
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -98,6 +103,15 @@ export const useBrowserStore = defineStore('browser', {
       send('focus:dismiss')
     },
     closePalette(): void {
+      send('palette:close')
+    },
+    queryPalette(query: string): void {
+      send('palette:query', { query })
+    },
+    runResult(result: PaletteResult): void {
+      // Dispatch the result's command through the same cmd:* channel any caller
+      // uses, then close the palette.
+      send(result.cmd, result.payload)
       send('palette:close')
     },
     startWorkspace(id: string): void {

@@ -30,6 +30,16 @@ export interface Workspace {
   pinnedSites: string[]
 }
 
+/** A command-palette result row. Selecting it dispatches `cmd` with `payload`. */
+export interface PaletteResult {
+  id: string
+  title: string
+  subtitle?: string
+  icon?: string
+  cmd: Command
+  payload?: unknown
+}
+
 /** Focus-session phase. */
 export type FocusPhase = 'idle' | 'focus' | 'break'
 
@@ -112,6 +122,8 @@ export interface BrowserState {
   showCompletion: boolean
   /** When true, show the Ctrl+K command palette overlay. */
   showPalette: boolean
+  /** Ranked palette results for the current query. */
+  paletteResults: PaletteResult[]
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -143,9 +155,12 @@ export type Command =
   | 'roles:add'
   | 'roles:remove'
   | 'focus:menu'
+  | 'focus:start'
   | 'focus:control'
   | 'focus:dismiss'
+  | 'workspace:switch'
   | 'palette:close'
+  | 'palette:query'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

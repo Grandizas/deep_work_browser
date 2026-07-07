@@ -10,7 +10,8 @@ import { initHistory, logVisit, closeHistory, logSession } from './history'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
-import type { WorkspaceSummary, RolesConfig } from '../shared/types'
+import { computePaletteResults } from './palette'
+import type { WorkspaceSummary, RolesConfig, PaletteResult } from '../shared/types'
 
 const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
 
@@ -74,6 +75,7 @@ function createWindow(): void {
   let showCompletion = false
   // Ctrl+K command palette overlay (full-window, hides tabs while open).
   let showPalette = false
+  let paletteResults: PaletteResult[] = []
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -117,6 +119,7 @@ function createWindow(): void {
       focus: focus.snapshot(),
       showCompletion,
       showPalette,
+      paletteResults,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -377,6 +380,7 @@ function createWindow(): void {
   const closePalette = (): void => {
     if (!showPalette) return
     showPalette = false
+    paletteResults = []
     layoutViews()
     activeView()?.show(contentRegion())
     pushState()
@@ -384,6 +388,18 @@ function createWindow(): void {
   const togglePalette = (): void => {
     if (showPalette) closePalette()
     else openPalette()
+  }
+  const runPaletteQuery = (query: string): void => {
+    const view = activeView()
+    const tabsState = view ? view.tabs.getState() : { tabs: [], activeTabId: null }
+    paletteResults = computePaletteResults(query, {
+      tabs: tabsState.tabs,
+      activeTabId: tabsState.activeTabId,
+      workspaces: workspaceSummaries(),
+      activeWorkspaceId: activeId,
+      roles: roles.getEffective(activeId)
+    })
+    pushState()
   }
 
   // Commands: renderer → main. Reject anything not sent by our chrome view —
@@ -397,6 +413,8 @@ function createWindow(): void {
       granted?: boolean
       role?: string
       pattern?: string
+      minutes?: number
+      query?: string
     }
 
     switch (message.cmd) {
@@ -452,6 +470,15 @@ function createWindow(): void {
         break
       case 'palette:close':
         closePalette()
+        break
+      case 'palette:query':
+        if (typeof payload.query === 'string') runPaletteQuery(payload.query)
+        break
+      case 'focus:start':
+        if (typeof payload.minutes === 'number') startFocusSession(payload.minutes)
+        break
+      case 'workspace:switch':
+        if (typeof payload.id === 'string') switchWorkspace(payload.id)
         break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)
