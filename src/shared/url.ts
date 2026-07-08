@@ -26,3 +26,18 @@ export function toNavigationUrl(input: string): string | null {
 
   return SEARCH_URL + encodeURIComponent(text)
 }
+
+/**
+ * The note-keying origin for a page URL: its host, `www.` stripped. Only http(s)
+ * pages get one — data:/about:/file: pages (dashboard, blank tabs) return ''.
+ */
+export function originOf(url: string): string {
+  if (!url) return ''
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return ''
+    return u.hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}

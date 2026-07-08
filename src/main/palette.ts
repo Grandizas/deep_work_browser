@@ -1,5 +1,5 @@
 import type { PaletteResult, TabState, WorkspaceSummary, RolesConfig } from '../shared/types'
-import { searchHistory } from './history'
+import { searchHistory, listNotes } from './history'
 
 interface PaletteContext {
   tabs: TabState[]
@@ -125,6 +125,27 @@ export function computePaletteResults(query: string, ctx: PaletteContext): Palet
       (s.subtitle && fuzzyMatch(q, s.subtitle.toLowerCase()))
     ) {
       out.push(s)
+    }
+  }
+
+  // --- Notes ---
+  // Typing "notes" lists every saved note; otherwise a note surfaces when its
+  // origin matches the query. Selecting one jumps to that site.
+  const noteResult = (n: { origin: string; body: string }): PaletteResult => ({
+    id: `note-${n.origin}`,
+    icon: '📝',
+    title: `Notes: ${n.origin}`,
+    subtitle: n.body.replace(/\s+/g, ' ').slice(0, 60),
+    cmd: 'tab:navigate',
+    payload: { url: `https://${n.origin}` }
+  })
+  // "not"/"note"/"notes" (a prefix of the keyword) lists everything; a prefix
+  // gate, not fuzzyMatch, so stray subsequences like "s" or "te" don't trigger it.
+  if (q.length >= 3 && 'notes'.startsWith(q)) {
+    for (const n of listNotes()) out.push(noteResult(n))
+  } else if (q) {
+    for (const n of listNotes()) {
+      if (fuzzyMatch(q, n.origin.toLowerCase())) out.push(noteResult(n))
     }
   }
 

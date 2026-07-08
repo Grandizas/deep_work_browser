@@ -70,18 +70,21 @@ function onEnter(): void {
       ›
     </button>
     <button class="nav" aria-label="Reload" title="Reload" @click="store.reload()">⟳</button>
-    <input
-      ref="urlInput"
-      v-model="draft"
-      class="url"
-      type="text"
-      spellcheck="false"
-      autocomplete="off"
-      placeholder="Search or enter address"
-      @focus="onFocus"
-      @blur="onBlur"
-      @keyup.enter="onEnter"
-    />
+    <div class="url-wrap">
+      <input
+        ref="urlInput"
+        v-model="draft"
+        class="url"
+        type="text"
+        spellcheck="false"
+        autocomplete="off"
+        placeholder="Search or enter address"
+        @focus="onFocus"
+        @blur="onBlur"
+        @keyup.enter="onEnter"
+      />
+      <span v-if="store.activeHasNote" class="note-dot" title="This site has notes" />
+    </div>
     <button
       class="nav star"
       :class="{ active: store.isActiveTabPinned }"
@@ -90,6 +93,15 @@ function onEnter(): void {
       @click="store.toggleActiveTabPinned()"
     >
       {{ store.isActiveTabPinned ? '★' : '☆' }}
+    </button>
+    <button
+      class="nav notes-btn"
+      :class="{ active: store.showNotes }"
+      aria-label="Notes"
+      title="Notes (Ctrl+Shift+N)"
+      @click="store.toggleNotes()"
+    >
+      📝
     </button>
     <button
       class="nav"
@@ -142,11 +154,17 @@ function onEnter(): void {
   color: var(--accent);
 }
 
-.url {
+.url-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
-  height: 32px;
   margin-left: 4px;
+  display: flex;
+  align-items: center;
+}
+.url {
+  width: 100%;
+  height: 32px;
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -158,5 +176,23 @@ function onEnter(): void {
 .url:focus {
   border-color: var(--accent, var(--ev-c-gray-1));
   background: var(--color-background-soft);
+}
+/* Non-interactive indicator that the current site has a saved note. Clicks pass
+   through to the address input; use the 📝 button or Ctrl+Shift+N to open notes. */
+.note-dot {
+  position: absolute;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #4f8cff);
+  pointer-events: none;
+}
+.notes-btn {
+  font-size: 14px;
+}
+.notes-btn.active {
+  background: var(--color-background-mute);
+  color: var(--accent);
 }
 </style>
