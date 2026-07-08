@@ -559,10 +559,16 @@ export class TabManager {
   }
 
   destroy(): void {
-    for (const tab of this.tabs) {
-      if (!tab.view) continue
-      this.window.contentView.removeChildView(tab.view)
-      if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close()
+    // On window 'closed', the window and its child views are already gone —
+    // touching contentView would throw "Object has been destroyed". Only detach
+    // views while the window is alive; otherwise just drop our references and let
+    // Electron's own teardown stand.
+    if (!this.window.isDestroyed()) {
+      for (const tab of this.tabs) {
+        if (!tab.view) continue
+        this.window.contentView.removeChildView(tab.view)
+        if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close()
+      }
     }
     this.tabs = []
     this.activeId = null
