@@ -1,5 +1,6 @@
 import { session } from 'electron'
 import { roleForUrl, sameSite } from './blocking'
+import { isAdOrTracker } from './adblock'
 
 /**
  * Network-layer blocking (Layer 1) for one workspace session. Cancels requests
@@ -27,6 +28,11 @@ export class NetworkBlocker {
     ses.webRequest.onBeforeRequest((details, callback) => {
       if (details.resourceType === 'mainFrame') {
         callback({})
+        return
+      }
+      // Ad/tracker blocking (Ghostery engine) — any sub-resource, on any page.
+      if (isAdOrTracker(details)) {
+        callback({ cancel: true })
         return
       }
       if (roleForUrl(details.url, this.workspaceId) !== 'distraction') {

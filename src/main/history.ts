@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import type { DashboardStats } from '../shared/types'
+import type { DashboardStats, HistoryEntry } from '../shared/types'
 
 let db: Database.Database | null = null
 let insertVisit: Database.Statement | null = null
@@ -96,20 +96,50 @@ export function logVisit(url: string, title: string, workspaceId: string | null)
   insertVisit.run(url, title || null, workspaceId, Date.now())
 }
 
+// Escape LIKE wildcards (% _) and the escape char itself so a user searching for
+// e.g. "50%" or "test_1" matches literally. Paired with `ESCAPE '\'` in queries.
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => '\\' + c)
+}
+
 /** Recent distinct history entries whose url or title matches `query`. */
 export function searchHistory(
   query: string,
   limit: number
 ): { url: string; title: string | null }[] {
   if (!db || !query) return []
-  const like = `%${query}%`
+  const like = `%${escapeLike(query)}%`
   return db
     .prepare(
       `SELECT url, title, MAX(visited_at) AS v FROM history
-       WHERE url LIKE ? OR title LIKE ?
+       WHERE url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\'
        GROUP BY url ORDER BY v DESC LIMIT ?`
     )
     .all(like, like, limit) as { url: string; title: string | null }[]
+}
+
+/**
+ * A workspace's distinct history, most-recent first, optionally filtered by a
+ * query (matches url or title). Empty query returns recent history.
+ */
+export function queryHistory(workspaceId: string, query: string, limit: number): HistoryEntry[] {
+  if (!db) return []
+  if (query) {
+    const like = `%${escapeLike(query)}%`
+    return db
+      .prepare(
+        `SELECT url, title, MAX(visited_at) AS visitedAt FROM history
+         WHERE workspace_id = ? AND (url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\')
+         GROUP BY url ORDER BY visitedAt DESC LIMIT ?`
+      )
+      .all(workspaceId, like, like, limit) as HistoryEntry[]
+  }
+  return db
+    .prepare(
+      `SELECT url, title, MAX(visited_at) AS visitedAt FROM history
+       WHERE workspace_id = ? GROUP BY url ORDER BY visitedAt DESC LIMIT ?`
+    )
+    .all(workspaceId, limit) as HistoryEntry[]
 }
 
 /** Log a "Continue Anyway" override past the blocking interstitial. */

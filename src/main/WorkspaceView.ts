@@ -27,7 +27,9 @@ export class WorkspaceView {
     readonly workspace: Workspace,
     onChange: () => void,
     initialRegion: Rectangle,
-    onNavigate: (info: { url: string; title: string }) => void
+    onNavigate: (info: { url: string; title: string }) => void,
+    onFound: (current: number, total: number) => void,
+    zoomFor: (origin: string) => number
   ) {
     this.downloads = new DownloadManager(workspace.partition, onChange)
     this.permissions = new PermissionManager(workspace.partition, onChange)
@@ -46,7 +48,9 @@ export class WorkspaceView {
       decide,
       (url) => logOverride(url, workspace.id),
       (url) => logBlock(url, workspace.id),
-      () => dashboardDataUrl(getDashboardStats(workspace.id))
+      () => dashboardDataUrl(getDashboardStats(workspace.id)),
+      onFound,
+      zoomFor
     )
     this.downloads.attach()
     this.permissions.attach()

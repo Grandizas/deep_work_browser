@@ -30,6 +30,13 @@ export interface Workspace {
   pinnedSites: string[]
 }
 
+/** A history entry for the searchable History screen. */
+export interface HistoryEntry {
+  url: string
+  title: string | null
+  visitedAt: number
+}
+
 /** Daily dashboard stats, computed in main from SQLite for the new-tab page. */
 export interface DashboardStats {
   sessionsToday: number
@@ -159,6 +166,16 @@ export interface BrowserState {
   ambientSound: string | null
   /** True when a tab is playing audio, so the renderer fades ambient down. */
   ambientDucked: boolean
+  /** When true, show the find-in-page bar (Ctrl+F). */
+  showFind: boolean
+  /** Find-in-page match position: 1-based current match and total (0/0 = none). */
+  findResult: { current: number; total: number }
+  /** Active tab's zoom as a percentage (100 = default), for the toolbar readout. */
+  zoomPercent: number
+  /** When true, show the full-window searchable History screen. */
+  showHistory: boolean
+  /** Results for the History screen (this workspace's history). */
+  historyResults: HistoryEntry[]
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -203,6 +220,16 @@ export type Command =
   | 'session:resume'
   | 'session:dismiss'
   | 'ambient:set'
+  | 'find:open'
+  | 'find:query'
+  | 'find:next'
+  | 'find:close'
+  | 'zoom:in'
+  | 'zoom:out'
+  | 'zoom:reset'
+  | 'history:open'
+  | 'history:query'
+  | 'history:close'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

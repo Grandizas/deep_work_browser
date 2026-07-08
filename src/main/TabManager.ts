@@ -7,7 +7,7 @@ import {
   type WebContents,
   type MenuItemConstructorOptions
 } from 'electron'
-import { toNavigationUrl } from '../shared/url'
+import { toNavigationUrl, originOf } from '../shared/url'
 import { interstitialUrl, parseInterstitialAction } from './interstitial'
 import { siteOf } from './blocking'
 import type { BrowserState, TabState } from '../shared/types'
@@ -37,10 +37,22 @@ interface Tab {
   pendingUrl: string | null
   // True while this tab is playing audio — drives ambient-sound ducking.
   audible: boolean
+  // Activation order (higher = more recent), for evicting the least-recently-used
+  // background tab when the live-view cap is exceeded.
+  lastActive: number
+  // When a tab showing the interstitial is discarded, its pendingUrl is the
+  // BLOCKED destination — re-run the block check on re-materialization so the
+  // distraction doesn't silently load. (Session-restored tabs stay false.)
+  recheckOnRestore: boolean
 }
 
 let tabSeq = 0
 const nextId = (): string => `tab-${++tabSeq}`
+
+// Cap on live (materialized) tab views per workspace. Beyond this, the least-
+// recently-active background tabs are discarded back to placeholders and
+// re-materialize (reload) on next activation — bounding memory for big sessions.
+const MAX_LIVE_TABS = 8
 
 /**
  * Owns every tab's WebContentsView for one window: create / close / activate /
@@ -51,6 +63,7 @@ const nextId = (): string => `tab-${++tabSeq}`
 export class TabManager {
   private tabs: Tab[] = []
   private activeId: string | null = null
+  private activateCounter = 0
 
   constructor(
     private readonly window: BaseWindow,
@@ -69,7 +82,11 @@ export class TabManager {
     // Called when a top-level navigation is blocked (interstitial shown).
     private readonly onBlock: (url: string) => void,
     // Builds the internal new-tab page (dashboard) as a data URL, on demand.
-    private readonly homePage: () => string
+    private readonly homePage: () => string,
+    // Reports find-in-page results (1-based current match, total) for the find bar.
+    private readonly onFound: (current: number, total: number) => void,
+    // The saved zoom level for an origin, applied to a page after it navigates.
+    private readonly zoomFor: (origin: string) => number
   ) {}
 
   private get active(): Tab | undefined {
@@ -101,7 +118,9 @@ export class TabManager {
       overrideSite: null,
       isHome: false,
       pendingUrl: null,
-      audible: false
+      audible: false,
+      lastActive: 0,
+      recheckOnRestore: false
     }
     this.tabs.push(tab)
     return tab
@@ -194,8 +213,15 @@ export class TabManager {
       tab.audible = false
       changed()
     })
+    wc.on('found-in-page', (_e, result) => {
+      // Chromium only includes matches on the final result of a request; report
+      // whatever it gives (activeMatchOrdinal is 1-based, 0 when nothing matches).
+      this.onFound(result.activeMatchOrdinal ?? 0, result.matches ?? 0)
+    })
     wc.on('did-navigate', () => {
       tab.audible = false
+      // Restore this origin's saved zoom (Chromium resets zoom on cross-origin nav).
+      wc.setZoomLevel(this.zoomFor(originOf(wc.getURL())))
       changed()
       this.onNavigate({ url: wc.getURL(), title: wc.getTitle() })
     })
@@ -311,9 +337,12 @@ export class TabManager {
     if (!target.view) {
       this.materialize(target)
       const url = target.pendingUrl ?? 'about:blank'
+      const recheck = target.recheckOnRestore
       target.pendingUrl = null
-      this.loadInTab(target, url, false)
+      target.recheckOnRestore = false
+      this.loadInTab(target, url, recheck)
     }
+    target.lastActive = ++this.activateCounter
     for (const tab of this.tabs) {
       if (!tab.view) continue // placeholders have no view to show
       const isActive = tab.id === id
@@ -321,7 +350,42 @@ export class TabManager {
       if (isActive) tab.view.setBounds(this.bounds)
     }
     this.active?.view?.webContents.focus()
+    this.enforceMemoryGuard()
     this.onChange()
+  }
+
+  // Discard the least-recently-active background tabs back to placeholders once
+  // the live-view cap is exceeded. They reload from `pendingUrl` on re-activation.
+  private enforceMemoryGuard(): void {
+    const liveCount = this.tabs.filter((t) => t.view).length
+    if (liveCount <= MAX_LIVE_TABS) return
+    const evictable = this.tabs
+      .filter((t) => t.view && t.id !== this.activeId && !t.audible)
+      .sort((a, b) => a.lastActive - b.lastActive)
+    let excess = liveCount - MAX_LIVE_TABS
+    for (const tab of evictable) {
+      if (excess <= 0) break
+      this.discard(tab)
+      excess--
+    }
+  }
+
+  // Turn a materialized tab back into a placeholder: remember its URL, destroy
+  // its view/renderer. getState then renders it like any lazy-restored tab.
+  private discard(tab: Tab): void {
+    if (!tab.view) return
+    const wc = tab.view.webContents
+    const url = tab.isHome
+      ? ''
+      : (tab.blockedUrl ?? tab.errorUrl ?? (wc.isDestroyed() ? '' : wc.getURL()))
+    // If it was on the interstitial, the saved URL is the blocked site — re-check
+    // it on restore so the distraction doesn't come back unblocked.
+    tab.recheckOnRestore = tab.blockedUrl !== null
+    this.window.contentView.removeChildView(tab.view)
+    if (!wc.isDestroyed()) wc.close()
+    tab.view = null
+    tab.pendingUrl = url
+    tab.audible = false
   }
 
   close(id: string): void {
@@ -403,6 +467,33 @@ export class TabManager {
     } else {
       wc.reload()
     }
+  }
+
+  /** The active tab's current Chromium zoom level (0 = 100%). */
+  getZoom(): number {
+    return this.active?.view?.webContents.getZoomLevel() ?? 0
+  }
+
+  /** Set the active tab's zoom level. */
+  setZoom(level: number): void {
+    this.active?.view?.webContents.setZoomLevel(level)
+  }
+
+  /** Find-in-page in the active tab. `findNext` steps through existing matches. */
+  find(text: string, options?: { forward?: boolean; findNext?: boolean }): void {
+    const wc = this.active?.view?.webContents
+    if (!wc) return
+    if (!text) {
+      wc.stopFindInPage('clearSelection')
+      this.onFound(0, 0)
+      return
+    }
+    wc.findInPage(text, options)
+  }
+
+  /** Clear the active tab's find highlights (closing the find bar). */
+  stopFind(): void {
+    this.active?.view?.webContents.stopFindInPage('clearSelection')
   }
 
   /** Cycle the active tab by `delta` (+1 next, -1 previous), wrapping around. */

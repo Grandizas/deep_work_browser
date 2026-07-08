@@ -1,5 +1,6 @@
 import { app, BaseWindow, WebContentsView, ipcMain, Menu, type Rectangle } from 'electron'
 import { join } from 'path'
+import { autoUpdater } from 'electron-updater'
 import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
@@ -14,14 +15,22 @@ import {
   getNote,
   setNote,
   hasNote,
-  countNotes
+  countNotes,
+  queryHistory
 } from './history'
 import { originOf } from '../shared/url'
+import { initAdblock } from './adblock'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
 import { computePaletteResults } from './palette'
-import type { WorkspaceSummary, RolesConfig, PaletteResult, ResumeInfo } from '../shared/types'
+import type {
+  WorkspaceSummary,
+  RolesConfig,
+  PaletteResult,
+  ResumeInfo,
+  HistoryEntry
+} from '../shared/types'
 
 const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
 
@@ -40,6 +49,7 @@ const BASE_CHROME_HEIGHT = 88
 const SHELF_HEIGHT = 48
 const PROMPT_HEIGHT = 48
 const BOOKMARKS_HEIGHT = 36
+const FIND_HEIGHT = 44
 // Width of the website-notes side panel. Mirrors `.notes-panel { width }` in the
 // renderer so the shrunk tab view lines up with the panel's left edge.
 const NOTES_PANEL_WIDTH = 340
@@ -105,6 +115,14 @@ function createWindow(): void {
   // Last-pushed ambient-duck state, so a background workspace's audio change can
   // detect a flip and push even though it doesn't otherwise re-render the chrome.
   let lastDucked = false
+  // Find-in-page: a chrome-strip row (like the download shelf). findText is the
+  // last query, so find:next can step without the renderer resending it.
+  let showFind = false
+  let findText = ''
+  let findResult = { current: 0, total: 0 }
+  // Full-window searchable History screen (this workspace's history).
+  let showHistory = false
+  let historyResults: HistoryEntry[] = []
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -118,6 +136,7 @@ function createWindow(): void {
     return (
       BASE_CHROME_HEIGHT +
       (hasPins ? BOOKMARKS_HEIGHT : 0) +
+      (showFind ? FIND_HEIGHT : 0) +
       (view.downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
       (view.permissions.current() ? PROMPT_HEIGHT : 0)
     )
@@ -183,6 +202,12 @@ function createWindow(): void {
       ambientSound,
       // Duck while any tab in any workspace is playing audio.
       ambientDucked: (lastDucked = anyTabAudible()),
+      showFind,
+      findResult,
+      // Active tab's zoom as a percentage (100 = default) for the toolbar readout.
+      zoomPercent: Math.round(Math.pow(1.2, view ? view.tabs.getZoom() : 0) * 100),
+      showHistory,
+      historyResults,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -237,7 +262,22 @@ function createWindow(): void {
         }
         persist()
       }
-      view = new WorkspaceView(mainWindow, ws, onChange, contentRegion(), onNavigate)
+      // Find-in-page results from THIS workspace only matter while it's active.
+      const onFound = (current: number, total: number): void => {
+        if (id === activeId) {
+          findResult = { current, total }
+          pushState()
+        }
+      }
+      view = new WorkspaceView(
+        mainWindow,
+        ws,
+        onChange,
+        contentRegion(),
+        onNavigate,
+        onFound,
+        (origin) => settings.getZoom(origin)
+      )
       workspaceViews.set(id, view)
       restoreTabs(view, id)
     }
@@ -307,6 +347,7 @@ function createWindow(): void {
   // (created and restored on first visit). Both stay alive across the switch.
   const switchWorkspace = (id: string): void => {
     if (id === activeId) return
+    if (showFind) closeFind() // find highlights/results belong to the old tab
     persistTabsFor(activeId)
     activeView()?.hide()
 
@@ -412,7 +453,7 @@ function createWindow(): void {
   // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showResume || showPicker || showSettings || showCompletion || showPalette) {
+    if (showResume || showPicker || showSettings || showCompletion || showPalette || showHistory) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -467,7 +508,7 @@ function createWindow(): void {
 
   // Command palette (Ctrl+K): full-window overlay, tabs hidden while open.
   const openPalette = (): void => {
-    if (showPalette || showPicker || showSettings || showCompletion) return
+    if (showPalette || showPicker || showSettings || showCompletion || showHistory) return
     showPalette = true
     activeView()?.hide()
     chromeView.webContents.focus()
@@ -535,6 +576,80 @@ function createWindow(): void {
     pushState()
   }
 
+  // Find-in-page (Ctrl+F): a chrome-strip row that drives the active tab's
+  // findInPage. The row grows chromeHeight, so the tab view shifts down for it.
+  const openFind = (): void => {
+    showFind = true
+    findResult = { current: 0, total: 0 }
+    layoutViews()
+    // Focus the chrome renderer so the find field (which autofocuses on mount)
+    // gets keystrokes even if a tab page currently has focus.
+    chromeView.webContents.focus()
+    pushState()
+  }
+  const runFind = (text: string): void => {
+    findText = text
+    if (!text) findResult = { current: 0, total: 0 }
+    activeView()?.tabs.find(text)
+    pushState()
+  }
+  const findNext = (forward: boolean): void => {
+    if (!findText) return
+    activeView()?.tabs.find(findText, { forward, findNext: true })
+  }
+  const closeFind = (): void => {
+    if (!showFind) return
+    showFind = false
+    findText = ''
+    findResult = { current: 0, total: 0 }
+    activeView()?.tabs.stopFind()
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+
+  // Per-site zoom (Chromium zoom levels; factor = 1.2^level). The active tab's
+  // origin remembers its level, re-applied on navigation (see TabManager).
+  const ZOOM_MIN = -3
+  const ZOOM_MAX = 5
+  const applyZoom = (delta: number | 'reset'): void => {
+    const view = activeView()
+    if (!view) return
+    const level =
+      delta === 'reset' ? 0 : Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, view.tabs.getZoom() + delta))
+    view.tabs.setZoom(level)
+    const url = view.tabs
+      .getState()
+      .tabs.find((t) => t.id === view.tabs.getState().activeTabId)?.url
+    const origin = originOf(url ?? '')
+    if (origin) settings.setZoom(origin, level)
+    pushState()
+  }
+
+  // Full-window searchable History screen (this workspace only).
+  const openHistory = (): void => {
+    if (showHistory || showPicker || showResume || showSettings || showCompletion || showPalette)
+      return
+    showHistory = true
+    historyResults = queryHistory(activeId, '', 200)
+    activeView()?.hide()
+    chromeView.webContents.focus()
+    layoutViews()
+    pushState()
+  }
+  const runHistoryQuery = (query: string): void => {
+    historyResults = queryHistory(activeId, query.trim(), 200)
+    pushState()
+  }
+  const closeHistory = (): void => {
+    if (!showHistory) return
+    showHistory = false
+    historyResults = []
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -551,6 +666,8 @@ function createWindow(): void {
       origin?: string
       body?: string
       sound?: string | null
+      text?: string
+      forward?: boolean
     }
 
     switch (message.cmd) {
@@ -647,6 +764,36 @@ function createWindow(): void {
           setAmbient(payload.sound)
         }
         break
+      case 'find:open':
+        openFind()
+        break
+      case 'find:query':
+        if (typeof payload.text === 'string') runFind(payload.text)
+        break
+      case 'find:next':
+        findNext(payload.forward !== false)
+        break
+      case 'find:close':
+        closeFind()
+        break
+      case 'zoom:in':
+        applyZoom(1)
+        break
+      case 'zoom:out':
+        applyZoom(-1)
+        break
+      case 'zoom:reset':
+        applyZoom('reset')
+        break
+      case 'history:open':
+        openHistory()
+        break
+      case 'history:query':
+        if (typeof payload.query === 'string') runHistoryQuery(payload.query)
+        break
+      case 'history:close':
+        closeHistory()
+        break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)
         break
@@ -684,7 +831,12 @@ function createWindow(): void {
     prevTab: () => activeView()?.tabs.activateAdjacent(-1),
     reload: () => activeView()?.tabs.reload(),
     togglePalette,
-    toggleNotes
+    toggleNotes,
+    openFind,
+    zoomIn: () => applyZoom(1),
+    zoomOut: () => applyZoom(-1),
+    zoomReset: () => applyZoom('reset'),
+    openHistory
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'
@@ -732,6 +884,7 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
   initHistory()
+  initAdblock()
   workspaces.init()
   roles.init()
   // Log every finished focus session to SQLite (app-level, not per-window).
@@ -744,6 +897,14 @@ app.whenReady().then(() => {
   installAppMenu(() => activeActions)
 
   createWindow()
+
+  // Auto-update: check GitHub releases and notify when an update is downloaded.
+  // Only in packaged builds — in dev there's no update feed to hit.
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.error('[updater] check failed:', err)
+    })
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
