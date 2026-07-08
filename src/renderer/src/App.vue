@@ -13,6 +13,7 @@ import CommandPalette from './components/CommandPalette.vue'
 import NotesPanel from './components/NotesPanel.vue'
 import ResumeCard from './components/ResumeCard.vue'
 import AmbientAudio from './components/AmbientAudio.vue'
+import FindBar from './components/FindBar.vue'
 
 const store = useBrowserStore()
 
@@ -45,6 +46,7 @@ onUnmounted(() => unsubscribe?.())
   >
     <TabBar />
     <Toolbar />
+    <FindBar v-if="store.showFind" />
     <Bookmarks v-if="store.pinnedSites.length" />
     <PermissionPrompt />
     <Downloads v-if="store.downloads.length" />

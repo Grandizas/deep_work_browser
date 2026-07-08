@@ -69,7 +69,9 @@ export class TabManager {
     // Called when a top-level navigation is blocked (interstitial shown).
     private readonly onBlock: (url: string) => void,
     // Builds the internal new-tab page (dashboard) as a data URL, on demand.
-    private readonly homePage: () => string
+    private readonly homePage: () => string,
+    // Reports find-in-page results (1-based current match, total) for the find bar.
+    private readonly onFound: (current: number, total: number) => void
   ) {}
 
   private get active(): Tab | undefined {
@@ -193,6 +195,11 @@ export class TabManager {
     wc.on('media-paused', () => {
       tab.audible = false
       changed()
+    })
+    wc.on('found-in-page', (_e, result) => {
+      // Chromium only includes matches on the final result of a request; report
+      // whatever it gives (activeMatchOrdinal is 1-based, 0 when nothing matches).
+      this.onFound(result.activeMatchOrdinal ?? 0, result.matches ?? 0)
     })
     wc.on('did-navigate', () => {
       tab.audible = false
@@ -403,6 +410,23 @@ export class TabManager {
     } else {
       wc.reload()
     }
+  }
+
+  /** Find-in-page in the active tab. `findNext` steps through existing matches. */
+  find(text: string, options?: { forward?: boolean; findNext?: boolean }): void {
+    const wc = this.active?.view?.webContents
+    if (!wc) return
+    if (!text) {
+      wc.stopFindInPage('clearSelection')
+      this.onFound(0, 0)
+      return
+    }
+    wc.findInPage(text, options)
+  }
+
+  /** Clear the active tab's find highlights (closing the find bar). */
+  stopFind(): void {
+    this.active?.view?.webContents.stopFindInPage('clearSelection')
   }
 
   /** Cycle the active tab by `delta` (+1 next, -1 previous), wrapping around. */

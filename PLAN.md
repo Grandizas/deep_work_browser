@@ -143,7 +143,7 @@ Done when: the dashboard replaces any urge for a separate stats app.
 
 ## Phase 11 — Polish pass
 
-- [ ] Find in page (Ctrl+F → `webContents.findInPage`)
+- [x] Find in page (Ctrl+F → `webContents.findInPage`)
 - [ ] Zoom controls per site (persist zoom level per origin)
 - [ ] Ad/tracker blocking: `@ghostery/adblocker-electron` on every workspace session
 - [ ] History UI (per workspace, searchable — mostly exists via palette already)

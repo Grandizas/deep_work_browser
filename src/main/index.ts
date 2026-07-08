@@ -40,6 +40,7 @@ const BASE_CHROME_HEIGHT = 88
 const SHELF_HEIGHT = 48
 const PROMPT_HEIGHT = 48
 const BOOKMARKS_HEIGHT = 36
+const FIND_HEIGHT = 44
 // Width of the website-notes side panel. Mirrors `.notes-panel { width }` in the
 // renderer so the shrunk tab view lines up with the panel's left edge.
 const NOTES_PANEL_WIDTH = 340
@@ -105,6 +106,11 @@ function createWindow(): void {
   // Last-pushed ambient-duck state, so a background workspace's audio change can
   // detect a flip and push even though it doesn't otherwise re-render the chrome.
   let lastDucked = false
+  // Find-in-page: a chrome-strip row (like the download shelf). findText is the
+  // last query, so find:next can step without the renderer resending it.
+  let showFind = false
+  let findText = ''
+  let findResult = { current: 0, total: 0 }
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -118,6 +124,7 @@ function createWindow(): void {
     return (
       BASE_CHROME_HEIGHT +
       (hasPins ? BOOKMARKS_HEIGHT : 0) +
+      (showFind ? FIND_HEIGHT : 0) +
       (view.downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
       (view.permissions.current() ? PROMPT_HEIGHT : 0)
     )
@@ -183,6 +190,8 @@ function createWindow(): void {
       ambientSound,
       // Duck while any tab in any workspace is playing audio.
       ambientDucked: (lastDucked = anyTabAudible()),
+      showFind,
+      findResult,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -237,7 +246,14 @@ function createWindow(): void {
         }
         persist()
       }
-      view = new WorkspaceView(mainWindow, ws, onChange, contentRegion(), onNavigate)
+      // Find-in-page results from THIS workspace only matter while it's active.
+      const onFound = (current: number, total: number): void => {
+        if (id === activeId) {
+          findResult = { current, total }
+          pushState()
+        }
+      }
+      view = new WorkspaceView(mainWindow, ws, onChange, contentRegion(), onNavigate, onFound)
       workspaceViews.set(id, view)
       restoreTabs(view, id)
     }
@@ -307,6 +323,7 @@ function createWindow(): void {
   // (created and restored on first visit). Both stay alive across the switch.
   const switchWorkspace = (id: string): void => {
     if (id === activeId) return
+    if (showFind) closeFind() // find highlights/results belong to the old tab
     persistTabsFor(activeId)
     activeView()?.hide()
 
@@ -535,6 +552,38 @@ function createWindow(): void {
     pushState()
   }
 
+  // Find-in-page (Ctrl+F): a chrome-strip row that drives the active tab's
+  // findInPage. The row grows chromeHeight, so the tab view shifts down for it.
+  const openFind = (): void => {
+    showFind = true
+    findResult = { current: 0, total: 0 }
+    layoutViews()
+    // Focus the chrome renderer so the find field (which autofocuses on mount)
+    // gets keystrokes even if a tab page currently has focus.
+    chromeView.webContents.focus()
+    pushState()
+  }
+  const runFind = (text: string): void => {
+    findText = text
+    if (!text) findResult = { current: 0, total: 0 }
+    activeView()?.tabs.find(text)
+    pushState()
+  }
+  const findNext = (forward: boolean): void => {
+    if (!findText) return
+    activeView()?.tabs.find(findText, { forward, findNext: true })
+  }
+  const closeFind = (): void => {
+    if (!showFind) return
+    showFind = false
+    findText = ''
+    findResult = { current: 0, total: 0 }
+    activeView()?.tabs.stopFind()
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -551,6 +600,8 @@ function createWindow(): void {
       origin?: string
       body?: string
       sound?: string | null
+      text?: string
+      forward?: boolean
     }
 
     switch (message.cmd) {
@@ -647,6 +698,18 @@ function createWindow(): void {
           setAmbient(payload.sound)
         }
         break
+      case 'find:open':
+        openFind()
+        break
+      case 'find:query':
+        if (typeof payload.text === 'string') runFind(payload.text)
+        break
+      case 'find:next':
+        findNext(payload.forward !== false)
+        break
+      case 'find:close':
+        closeFind()
+        break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)
         break
@@ -684,7 +747,8 @@ function createWindow(): void {
     prevTab: () => activeView()?.tabs.activateAdjacent(-1),
     reload: () => activeView()?.tabs.reload(),
     togglePalette,
-    toggleNotes
+    toggleNotes,
+    openFind
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'

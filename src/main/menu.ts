@@ -10,6 +10,7 @@ export interface MenuActions {
   reload(): void
   togglePalette(): void
   toggleNotes(): void
+  openFind(): void
 }
 
 /**
@@ -46,6 +47,7 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
           accelerator: 'CmdOrCtrl+Shift+N',
           click: run((a) => a.toggleNotes())
         },
+        { label: 'Find in Page', accelerator: 'CmdOrCtrl+F', click: run((a) => a.openFind()) },
         { type: 'separator' },
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: run((a) => a.reload()) },
         {

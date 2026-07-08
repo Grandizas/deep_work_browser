@@ -159,6 +159,10 @@ export interface BrowserState {
   ambientSound: string | null
   /** True when a tab is playing audio, so the renderer fades ambient down. */
   ambientDucked: boolean
+  /** When true, show the find-in-page bar (Ctrl+F). */
+  showFind: boolean
+  /** Find-in-page match position: 1-based current match and total (0/0 = none). */
+  findResult: { current: number; total: number }
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -203,6 +207,10 @@ export type Command =
   | 'session:resume'
   | 'session:dismiss'
   | 'ambient:set'
+  | 'find:open'
+  | 'find:query'
+  | 'find:next'
+  | 'find:close'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

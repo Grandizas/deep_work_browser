@@ -35,6 +35,8 @@ export const useBrowserStore = defineStore('browser', {
     activeHasNote: false,
     ambientSound: null as string | null,
     ambientDucked: false,
+    showFind: false,
+    findResult: { current: 0, total: 0 },
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -71,6 +73,8 @@ export const useBrowserStore = defineStore('browser', {
       this.activeHasNote = next.activeHasNote
       this.ambientSound = next.ambientSound
       this.ambientDucked = next.ambientDucked
+      this.showFind = next.showFind
+      this.findResult = next.findResult
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -132,6 +136,15 @@ export const useBrowserStore = defineStore('browser', {
     },
     setAmbient(sound: string | null): void {
       send('ambient:set', { sound })
+    },
+    findQuery(text: string): void {
+      send('find:query', { text })
+    },
+    findNext(forward: boolean): void {
+      send('find:next', { forward })
+    },
+    closeFind(): void {
+      send('find:close')
     },
     queryPalette(query: string): void {
       send('palette:query', { query })
