@@ -40,39 +40,53 @@ function add(role: RoleKey): void {
 <template>
   <div class="settings">
     <header class="head">
-      <h1>Website Roles</h1>
+      <div>
+        <h1>Website Roles</h1>
+        <p class="subtitle">How each site behaves while you're in a focus session.</p>
+      </div>
       <button class="done" @click="store.closeSettings()">Done</button>
     </header>
 
-    <div class="sections">
-      <section
-        v-for="sec in sections"
-        :key="sec.key"
-        class="section"
-        :style="{ '--role-accent': sec.accent }"
-      >
-        <h2>{{ sec.title }}</h2>
-        <p class="desc">{{ sec.desc }}</p>
+    <div class="scroll">
+      <div class="grid">
+        <section
+          v-for="sec in sections"
+          :key="sec.key"
+          class="section"
+          :style="{ '--role-accent': sec.accent }"
+        >
+          <div class="sec-head">
+            <h2>{{ sec.title }}</h2>
+            <span class="count">{{ store.roles[sec.key].length }}</span>
+          </div>
+          <p class="desc">{{ sec.desc }}</p>
 
-        <div class="chips">
-          <span v-for="p in store.roles[sec.key]" :key="p" class="chip">
-            {{ p }}
-            <button class="x" aria-label="Remove" @click="store.removeRole(sec.key, p)">×</button>
-          </span>
-          <span v-if="!store.roles[sec.key].length" class="empty">Nothing here yet.</span>
-        </div>
+          <div class="tags">
+            <span v-for="p in store.roles[sec.key]" :key="p" class="tag">
+              <span class="letter">{{ p[0].toUpperCase() }}</span>
+              {{ p }}
+              <button class="x" :aria-label="`Remove ${p}`" @click="store.removeRole(sec.key, p)">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            </span>
+            <div v-if="!store.roles[sec.key].length" class="empty">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+              <span>No sites yet — add one below.</span>
+            </div>
+          </div>
 
-        <div class="add">
-          <input
-            v-model="drafts[sec.key]"
-            type="text"
-            spellcheck="false"
-            placeholder="example.com"
-            @keyup.enter="add(sec.key)"
-          />
-          <button @click="add(sec.key)">Add</button>
-        </div>
-      </section>
+          <div class="add">
+            <input
+              v-model="drafts[sec.key]"
+              type="text"
+              spellcheck="false"
+              placeholder="example.com"
+              @keyup.enter="add(sec.key)"
+            />
+            <button class="add-btn" @click="add(sec.key)">Add</button>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 </template>
@@ -82,8 +96,9 @@ function add(role: RoleKey): void {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-background);
-  color: var(--color-text);
+  background: var(--flow-window);
+  color: var(--flow-text);
+  overflow: hidden;
   user-select: none;
 }
 
@@ -93,12 +108,19 @@ function add(role: RoleKey): void {
   justify-content: space-between;
   padding: 22px 32px;
   border-bottom: 1px solid var(--flow-line);
+  flex-shrink: 0;
 }
 .head h1 {
   font-family: var(--serif);
   font-weight: 400;
   font-size: 28px;
   letter-spacing: -0.01em;
+  margin: 0;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--flow-text-3);
+  margin: 3px 0 0;
 }
 .done {
   border: none;
@@ -114,55 +136,88 @@ function add(role: RoleKey): void {
   filter: brightness(1.08);
 }
 
-.sections {
+.scroll {
   flex: 1;
   overflow-y: auto;
+  padding: 28px;
+}
+.grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
-  padding: 28px;
+  align-items: start;
+  max-width: 1320px;
+  margin: 0 auto;
 }
 
 .section {
-  /* Default so tooling resolves var(--role-accent); the inline :style binding
-     overrides it per section with the role's colour. */
   --role-accent: #4f8cff;
   display: flex;
   flex-direction: column;
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--flow-line);
   border-top: 3px solid var(--role-accent);
-  border-radius: 14px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--role-accent) 5%, var(--flow-panel));
 }
-.section h2 {
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.sec-head h2 {
   font-size: 15px;
   font-weight: 600;
+  margin: 0;
+}
+.count {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--role-accent);
+  background: color-mix(in srgb, var(--role-accent) 16%, transparent);
 }
 .desc {
-  font-size: 12px;
-  color: var(--ev-c-text-2);
-  margin: 4px 0 14px;
-  min-height: 30px;
+  font-size: 12.5px;
+  color: var(--flow-text-2);
+  margin: 5px 0 16px;
+  min-height: 32px;
+  line-height: 1.45;
 }
 
-.chips {
-  flex: 1;
+.tags {
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
-  gap: 6px;
-  min-height: 60px;
-  margin-bottom: 14px;
+  gap: 7px;
+  min-height: 76px;
+  margin-bottom: 16px;
 }
-.chip {
+.tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 4px 4px 10px;
-  border-radius: 6px;
-  background: var(--color-background-mute);
-  font-size: 12px;
+  gap: 7px;
+  height: 28px;
+  padding: 0 6px 0 7px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--flow-text);
+  background: color-mix(in srgb, var(--role-accent) 12%, var(--flow-panel-2));
+  border: 1px solid color-mix(in srgb, var(--role-accent) 28%, transparent);
+}
+.letter {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: var(--role-accent);
+  color: #0c0d12;
+  font-size: 10px;
+  font-weight: 700;
 }
 .x {
   width: 16px;
@@ -172,50 +227,59 @@ function add(role: RoleKey): void {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--ev-c-text-2);
-  font-size: 14px;
-  line-height: 1;
+  color: var(--flow-text-3);
   cursor: default;
 }
 .x:hover {
-  background: var(--ev-c-gray-2);
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--role-accent) 22%, transparent);
+  color: var(--role-accent);
 }
 .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 76px;
+  color: var(--flow-text-4);
+}
+.empty span {
   font-size: 12px;
-  color: var(--ev-c-text-3);
 }
 
 .add {
   display: flex;
-  gap: 6px;
+  gap: 7px;
 }
 .add input {
   flex: 1;
   min-width: 0;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--ev-c-gray-3);
-  border-radius: 6px;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-size: 12px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--flow-line-2);
+  border-radius: 9px;
+  background: var(--flow-panel-2);
+  color: var(--flow-text);
+  font-size: 13px;
   outline: none;
 }
 .add input:focus {
   border-color: var(--role-accent);
 }
-.add button {
+.add-btn {
+  height: 34px;
+  flex-shrink: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 9px;
   background: var(--role-accent);
-  color: #fff;
-  font-size: 12px;
+  color: #0c0d12;
+  font-size: 13px;
   font-weight: 600;
-  padding: 0 14px;
+  padding: 0 16px;
   cursor: default;
 }
-.add button:hover {
+.add-btn:hover {
   filter: brightness(1.08);
 }
 </style>
