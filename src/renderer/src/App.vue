@@ -12,6 +12,7 @@ import CompletionScreen from './components/CompletionScreen.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import NotesPanel from './components/NotesPanel.vue'
 import ResumeCard from './components/ResumeCard.vue'
+import AmbientAudio from './components/AmbientAudio.vue'
 
 const store = useBrowserStore()
 
@@ -49,6 +50,7 @@ onUnmounted(() => unsubscribe?.())
     <Downloads v-if="store.downloads.length" />
   </div>
   <NotesPanel v-if="store.showNotes" />
+  <AmbientAudio />
 </template>
 
 <style scoped>
