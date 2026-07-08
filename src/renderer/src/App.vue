@@ -14,6 +14,7 @@ import NotesPanel from './components/NotesPanel.vue'
 import ResumeCard from './components/ResumeCard.vue'
 import AmbientAudio from './components/AmbientAudio.vue'
 import FindBar from './components/FindBar.vue'
+import HistoryView from './components/HistoryView.vue'
 
 const store = useBrowserStore()
 
@@ -37,6 +38,7 @@ onUnmounted(() => unsubscribe?.())
   <WorkspacePicker v-else-if="store.showPicker" />
   <Settings v-else-if="store.showSettings" />
   <CompletionScreen v-else-if="store.showCompletion" />
+  <HistoryView v-else-if="store.showHistory" />
   <CommandPalette v-else-if="store.showPalette" />
   <div
     v-else

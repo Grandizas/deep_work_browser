@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import type { DashboardStats } from '../shared/types'
+import type { DashboardStats, HistoryEntry } from '../shared/types'
 
 let db: Database.Database | null = null
 let insertVisit: Database.Statement | null = null
@@ -110,6 +110,30 @@ export function searchHistory(
        GROUP BY url ORDER BY v DESC LIMIT ?`
     )
     .all(like, like, limit) as { url: string; title: string | null }[]
+}
+
+/**
+ * A workspace's distinct history, most-recent first, optionally filtered by a
+ * query (matches url or title). Empty query returns recent history.
+ */
+export function queryHistory(workspaceId: string, query: string, limit: number): HistoryEntry[] {
+  if (!db) return []
+  if (query) {
+    const like = `%${query}%`
+    return db
+      .prepare(
+        `SELECT url, title, MAX(visited_at) AS visitedAt FROM history
+         WHERE workspace_id = ? AND (url LIKE ? OR title LIKE ?)
+         GROUP BY url ORDER BY visitedAt DESC LIMIT ?`
+      )
+      .all(workspaceId, like, like, limit) as HistoryEntry[]
+  }
+  return db
+    .prepare(
+      `SELECT url, title, MAX(visited_at) AS visitedAt FROM history
+       WHERE workspace_id = ? GROUP BY url ORDER BY visitedAt DESC LIMIT ?`
+    )
+    .all(workspaceId, limit) as HistoryEntry[]
 }
 
 /** Log a "Continue Anyway" override past the blocking interstitial. */

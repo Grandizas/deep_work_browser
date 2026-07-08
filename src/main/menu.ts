@@ -14,6 +14,7 @@ export interface MenuActions {
   zoomIn(): void
   zoomOut(): void
   zoomReset(): void
+  openHistory(): void
 }
 
 /**
@@ -55,6 +56,8 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
         { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', click: run((a) => a.zoomIn()) },
         { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: run((a) => a.zoomOut()) },
         { label: 'Reset Zoom', accelerator: 'CmdOrCtrl+0', click: run((a) => a.zoomReset()) },
+        { type: 'separator' },
+        { label: 'History', accelerator: 'CmdOrCtrl+H', click: run((a) => a.openHistory()) },
         { type: 'separator' },
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: run((a) => a.reload()) },
         {

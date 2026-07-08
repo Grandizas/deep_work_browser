@@ -146,7 +146,7 @@ Done when: the dashboard replaces any urge for a separate stats app.
 - [x] Find in page (Ctrl+F → `webContents.findInPage`)
 - [x] Zoom controls per site (persist zoom level per origin)
 - [x] Ad/tracker blocking: `@ghostery/adblocker-electron` on every workspace session — the engine's request matcher is folded into NetworkBlocker's single `onBeforeRequest` (network-level blocking; cosmetic element-hiding is out of scope for the no-preload sandboxed tab architecture)
-- [ ] History UI (per workspace, searchable — mostly exists via palette already)
+- [x] History UI (per workspace, searchable) — full-window History screen (Ctrl+H) listing this workspace's distinct history newest-first, with a search box; clicking an entry opens it
 - [ ] App icon, installer via electron-builder, auto-update wiring (you already said Yes to the updater plugin)
 - [x] Memory guard: destroy background tab views beyond N (8) per workspace, restore on demand — reuses the Phase 9 placeholder mechanism: the least-recently-active background tab is discarded to a placeholder (view/renderer destroyed, URL remembered) and reloads on re-activation; audible tabs are never discarded
 

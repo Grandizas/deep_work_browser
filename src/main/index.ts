@@ -14,7 +14,8 @@ import {
   getNote,
   setNote,
   hasNote,
-  countNotes
+  countNotes,
+  queryHistory
 } from './history'
 import { originOf } from '../shared/url'
 import { initAdblock } from './adblock'
@@ -22,7 +23,13 @@ import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
 import { computePaletteResults } from './palette'
-import type { WorkspaceSummary, RolesConfig, PaletteResult, ResumeInfo } from '../shared/types'
+import type {
+  WorkspaceSummary,
+  RolesConfig,
+  PaletteResult,
+  ResumeInfo,
+  HistoryEntry
+} from '../shared/types'
 
 const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
 
@@ -112,6 +119,9 @@ function createWindow(): void {
   let showFind = false
   let findText = ''
   let findResult = { current: 0, total: 0 }
+  // Full-window searchable History screen (this workspace's history).
+  let showHistory = false
+  let historyResults: HistoryEntry[] = []
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -195,6 +205,8 @@ function createWindow(): void {
       findResult,
       // Active tab's zoom as a percentage (100 = default) for the toolbar readout.
       zoomPercent: Math.round(Math.pow(1.2, view ? view.tabs.getZoom() : 0) * 100),
+      showHistory,
+      historyResults,
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -440,7 +452,7 @@ function createWindow(): void {
   // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showResume || showPicker || showSettings || showCompletion || showPalette) {
+    if (showResume || showPicker || showSettings || showCompletion || showPalette || showHistory) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -495,7 +507,7 @@ function createWindow(): void {
 
   // Command palette (Ctrl+K): full-window overlay, tabs hidden while open.
   const openPalette = (): void => {
-    if (showPalette || showPicker || showSettings || showCompletion) return
+    if (showPalette || showPicker || showSettings || showCompletion || showHistory) return
     showPalette = true
     activeView()?.hide()
     chromeView.webContents.focus()
@@ -610,6 +622,30 @@ function createWindow(): void {
       .tabs.find((t) => t.id === view.tabs.getState().activeTabId)?.url
     const origin = originOf(url ?? '')
     if (origin) settings.setZoom(origin, level)
+    pushState()
+  }
+
+  // Full-window searchable History screen (this workspace only).
+  const openHistory = (): void => {
+    if (showHistory || showPicker || showResume || showSettings || showCompletion || showPalette)
+      return
+    showHistory = true
+    historyResults = queryHistory(activeId, '', 200)
+    activeView()?.hide()
+    chromeView.webContents.focus()
+    layoutViews()
+    pushState()
+  }
+  const runHistoryQuery = (query: string): void => {
+    historyResults = queryHistory(activeId, query.trim(), 200)
+    pushState()
+  }
+  const closeHistory = (): void => {
+    if (!showHistory) return
+    showHistory = false
+    historyResults = []
+    layoutViews()
+    activeView()?.show(contentRegion())
     pushState()
   }
 
@@ -748,6 +784,15 @@ function createWindow(): void {
       case 'zoom:reset':
         applyZoom('reset')
         break
+      case 'history:open':
+        openHistory()
+        break
+      case 'history:query':
+        if (typeof payload.query === 'string') runHistoryQuery(payload.query)
+        break
+      case 'history:close':
+        closeHistory()
+        break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)
         break
@@ -789,7 +834,8 @@ function createWindow(): void {
     openFind,
     zoomIn: () => applyZoom(1),
     zoomOut: () => applyZoom(-1),
-    zoomReset: () => applyZoom('reset')
+    zoomReset: () => applyZoom('reset'),
+    openHistory
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'
