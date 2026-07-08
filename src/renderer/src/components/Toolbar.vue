@@ -136,13 +136,16 @@ function onEnter(): void {
           @blur="onBlur"
           @keyup.enter="onEnter"
         />
-        <span
+        <button
           v-if="store.zoomPercent !== 100"
           class="zoom"
+          aria-label="Reset zoom"
           title="Reset zoom (Ctrl+0)"
-          @mousedown.prevent="store.zoomReset()"
-          >{{ store.zoomPercent }}%</span
+          @mousedown.prevent
+          @click="store.zoomReset()"
         >
+          {{ store.zoomPercent }}%
+        </button>
         <span v-if="store.activeHasNote" class="note-dot" title="This site has notes" />
       </div>
     </div>

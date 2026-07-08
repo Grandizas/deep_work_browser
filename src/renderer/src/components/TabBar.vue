@@ -18,6 +18,7 @@ const store = useBrowserStore()
         :title="tab.title || tab.url"
         @click="store.activateTab(tab.id)"
         @keydown.enter="store.activateTab(tab.id)"
+        @keydown.space.prevent="store.activateTab(tab.id)"
       >
         <img v-if="tab.favicon" class="fav" :src="tab.favicon" alt="" />
         <span v-else class="fav dot" />
