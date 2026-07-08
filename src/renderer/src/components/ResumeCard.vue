@@ -59,10 +59,11 @@ const timerLabel = computed(() => {
   user-select: none;
 }
 .prompt {
-  font-size: 26px;
-  font-weight: 600;
+  font-family: var(--serif);
+  font-size: 38px;
+  font-weight: 400;
   color: var(--color-text);
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
 }
 .card {
   display: flex;

@@ -58,8 +58,10 @@ const countdown = computed(() => {
   margin-bottom: 8px;
 }
 h1 {
-  font-size: 26px;
-  font-weight: 600;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 38px;
+  letter-spacing: -0.01em;
 }
 .sub {
   font-size: 14px;
@@ -93,14 +95,14 @@ h1 {
   margin-top: 12px;
   border: none;
   border-radius: 10px;
-  background: var(--ev-c-gray-3);
-  color: var(--color-text);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
   font-size: 13px;
   font-weight: 600;
   padding: 10px 22px;
   cursor: default;
 }
 .browse:hover {
-  background: var(--ev-c-gray-2);
+  filter: brightness(1.08);
 }
 </style>

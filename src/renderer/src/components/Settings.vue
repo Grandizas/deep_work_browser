@@ -91,25 +91,27 @@ function add(role: RoleKey): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 28px;
-  border-bottom: 1px solid var(--ev-c-gray-3);
+  padding: 22px 32px;
+  border-bottom: 1px solid var(--flow-line);
 }
 .head h1 {
-  font-size: 20px;
-  font-weight: 600;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 28px;
+  letter-spacing: -0.01em;
 }
 .done {
   border: none;
-  border-radius: 8px;
-  background: var(--ev-c-gray-3);
-  color: var(--color-text);
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
   font-size: 13px;
   font-weight: 600;
-  padding: 8px 18px;
+  padding: 9px 20px;
   cursor: default;
 }
 .done:hover {
-  background: var(--ev-c-gray-2);
+  filter: brightness(1.08);
 }
 
 .sections {
@@ -128,10 +130,10 @@ function add(role: RoleKey): void {
   display: flex;
   flex-direction: column;
   padding: 18px;
-  border: 1px solid var(--ev-c-gray-3);
+  border: 1px solid var(--flow-line);
   border-top: 3px solid var(--role-accent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--role-accent) 5%, var(--color-background-soft));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--role-accent) 5%, var(--flow-panel));
 }
 .section h2 {
   font-size: 15px;
