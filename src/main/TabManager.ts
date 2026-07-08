@@ -37,10 +37,18 @@ interface Tab {
   pendingUrl: string | null
   // True while this tab is playing audio — drives ambient-sound ducking.
   audible: boolean
+  // Activation order (higher = more recent), for evicting the least-recently-used
+  // background tab when the live-view cap is exceeded.
+  lastActive: number
 }
 
 let tabSeq = 0
 const nextId = (): string => `tab-${++tabSeq}`
+
+// Cap on live (materialized) tab views per workspace. Beyond this, the least-
+// recently-active background tabs are discarded back to placeholders and
+// re-materialize (reload) on next activation — bounding memory for big sessions.
+const MAX_LIVE_TABS = 8
 
 /**
  * Owns every tab's WebContentsView for one window: create / close / activate /
@@ -51,6 +59,7 @@ const nextId = (): string => `tab-${++tabSeq}`
 export class TabManager {
   private tabs: Tab[] = []
   private activeId: string | null = null
+  private activateCounter = 0
 
   constructor(
     private readonly window: BaseWindow,
@@ -105,7 +114,8 @@ export class TabManager {
       overrideSite: null,
       isHome: false,
       pendingUrl: null,
-      audible: false
+      audible: false,
+      lastActive: 0
     }
     this.tabs.push(tab)
     return tab
@@ -325,6 +335,7 @@ export class TabManager {
       target.pendingUrl = null
       this.loadInTab(target, url, false)
     }
+    target.lastActive = ++this.activateCounter
     for (const tab of this.tabs) {
       if (!tab.view) continue // placeholders have no view to show
       const isActive = tab.id === id
@@ -332,7 +343,39 @@ export class TabManager {
       if (isActive) tab.view.setBounds(this.bounds)
     }
     this.active?.view?.webContents.focus()
+    this.enforceMemoryGuard()
     this.onChange()
+  }
+
+  // Discard the least-recently-active background tabs back to placeholders once
+  // the live-view cap is exceeded. They reload from `pendingUrl` on re-activation.
+  private enforceMemoryGuard(): void {
+    const liveCount = this.tabs.filter((t) => t.view).length
+    if (liveCount <= MAX_LIVE_TABS) return
+    const evictable = this.tabs
+      .filter((t) => t.view && t.id !== this.activeId && !t.audible)
+      .sort((a, b) => a.lastActive - b.lastActive)
+    let excess = liveCount - MAX_LIVE_TABS
+    for (const tab of evictable) {
+      if (excess <= 0) break
+      this.discard(tab)
+      excess--
+    }
+  }
+
+  // Turn a materialized tab back into a placeholder: remember its URL, destroy
+  // its view/renderer. getState then renders it like any lazy-restored tab.
+  private discard(tab: Tab): void {
+    if (!tab.view) return
+    const wc = tab.view.webContents
+    const url = tab.isHome
+      ? ''
+      : (tab.blockedUrl ?? tab.errorUrl ?? (wc.isDestroyed() ? '' : wc.getURL()))
+    this.window.contentView.removeChildView(tab.view)
+    if (!wc.isDestroyed()) wc.close()
+    tab.view = null
+    tab.pendingUrl = url
+    tab.audible = false
   }
 
   close(id: string): void {
