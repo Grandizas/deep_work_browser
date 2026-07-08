@@ -68,11 +68,7 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
-      // Let the ambient-sound AudioContext start without a click — the palette
-      // command that starts it is a gesture, but the play happens after an IPC
-      // round-trip, so Chromium's autoplay gate would otherwise block it.
-      autoplayPolicy: 'no-user-gesture-required'
+      sandbox: false
     }
   })
   mainWindow.contentView.addChildView(chromeView)
@@ -98,10 +94,6 @@ function createWindow(): void {
   let paletteResults: PaletteResult[] = []
   // Website-notes side panel — edits the active tab's origin (computed per push).
   let showNotes = false
-  // Ambient sound: the current sound id (null = silence) and the last non-null
-  // choice, so a focus session can auto-resume the sound you last picked.
-  let ambientSound: string | null = null
-  let lastAmbientSound: string | null = null
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -173,9 +165,6 @@ function createWindow(): void {
       noteOrigin: showNotes ? activeOrigin : '',
       noteBody: showNotes ? getNote(activeOrigin) : '',
       activeHasNote: hasNote(activeOrigin),
-      ambientSound,
-      // Duck while any tab in any workspace is playing audio.
-      ambientDucked: [...workspaceViews.values()].some((v) => v.tabs.anyAudible()),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -313,8 +302,6 @@ function createWindow(): void {
   const startFocusSession = (minutes: number): void => {
     const eff = roles.getEffective(activeId)
     focus.startFocus(activeId, minutes * 60_000, [...eff.essential, ...eff.reference])
-    // Auto-resume the last-chosen ambient sound when a session begins.
-    if (!ambientSound && lastAmbientSound) setAmbient(lastAmbientSound)
   }
   // Palette `new <workspace> session`: switch into the workspace first, then
   // start a focus session there (the allowlist is snapshotted from the target).
@@ -516,14 +503,6 @@ function createWindow(): void {
     pushState()
   }
 
-  // Ambient sound: main owns which sound is playing; the chrome renderer
-  // synthesizes it via Web Audio in response to the pushed state.
-  const setAmbient = (sound: string | null): void => {
-    ambientSound = sound
-    if (sound) lastAmbientSound = sound
-    pushState()
-  }
-
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -539,7 +518,6 @@ function createWindow(): void {
       query?: string
       origin?: string
       body?: string
-      sound?: string | null
     }
 
     switch (message.cmd) {
@@ -629,12 +607,6 @@ function createWindow(): void {
         break
       case 'session:dismiss':
         dismissResume()
-        break
-      case 'ambient:set':
-        // sound is a string id or null (silence); ignore anything else.
-        if (payload.sound === null || typeof payload.sound === 'string') {
-          setAmbient(payload.sound)
-        }
         break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)
