@@ -33,6 +33,8 @@ interface AppSettings {
   // Per-origin zoom level (Chromium zoom level, not factor), so a site reopens
   // at the size you left it.
   zoomByOrigin: Record<string, number>
+  // Sidebar visibility preferences (persist across restarts).
+  sidebars: { left: boolean; right: boolean }
 }
 
 const defaults: AppSettings = {
@@ -40,7 +42,8 @@ const defaults: AppSettings = {
   windowMaximized: false,
   openTabsByWorkspace: {},
   focusState: IDLE_FOCUS,
-  zoomByOrigin: {}
+  zoomByOrigin: {},
+  sidebars: { left: true, right: true }
 }
 
 // Lazily constructed: electron-store reads the userData path in its constructor,
@@ -74,5 +77,7 @@ export const settings = {
     if (level === 0) delete map[origin]
     else map[origin] = level
     s().set('zoomByOrigin', map)
-  }
+  },
+  getSidebars: (): { left: boolean; right: boolean } => s().get('sidebars'),
+  setSidebars: (sidebars: { left: boolean; right: boolean }): void => s().set('sidebars', sidebars)
 }

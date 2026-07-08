@@ -104,6 +104,10 @@ function createWindow(): void {
   const hasResumableSession = settings.getOpenTabs(activeId).urls.length > 0
   let showResume = hasResumableSession
   let showPicker = !hasResumableSession
+  // Sidebar visibility (persisted). Hiding a sidebar widens the page area.
+  const savedSidebars = settings.getSidebars()
+  let showLeftSidebar = savedSidebars.left
+  let showRightSidebar = savedSidebars.right
   // Full-window settings screen (hides the active tabs while open).
   let showSettings = false
   // Full-window focus-complete / break celebration screen.
@@ -148,15 +152,17 @@ function createWindow(): void {
   }
 
   // The inset region the active tab occupies: the center content card, between
-  // the two sidebars and below the top bar / tab bar, padded on all sides.
+  // the (optional) sidebars and below the top bar / tab bar, padded on all sides.
   const contentRegion = (): Rectangle => {
     const { width, height } = mainWindow.getContentBounds()
-    const x = FLOW_LEFT + FLOW_PAD
+    const leftW = showLeftSidebar ? FLOW_LEFT : 0
+    const rightW = showRightSidebar ? FLOW_RIGHT : 0
+    const x = leftW + FLOW_PAD
     const y = centerContentTop() + FLOW_PAD
     return {
       x,
       y,
-      width: Math.max(0, width - FLOW_LEFT - FLOW_RIGHT - FLOW_PAD * 2),
+      width: Math.max(0, width - leftW - rightW - FLOW_PAD * 2),
       height: Math.max(0, height - y - FLOW_PAD)
     }
   }
@@ -215,6 +221,8 @@ function createWindow(): void {
       resume: showResume ? resumeInfo() : null,
       showSettings,
       roles: roles.getGlobal(),
+      showLeftSidebar,
+      showRightSidebar,
       focus: focus.snapshot(),
       showCompletion,
       showPalette,
@@ -667,6 +675,17 @@ function createWindow(): void {
     pushState()
   }
 
+  // Show/hide a sidebar to widen the page area. Persisted. layoutViews() re-bounds
+  // the (visible) tab when browsing and leaves it hidden if a full-window modal is
+  // open — so we must NOT force-show the tab here (it would draw over the modal).
+  const toggleSidebar = (side: 'left' | 'right'): void => {
+    if (side === 'left') showLeftSidebar = !showLeftSidebar
+    else showRightSidebar = !showRightSidebar
+    settings.setSidebars({ left: showLeftSidebar, right: showRightSidebar })
+    layoutViews()
+    pushState()
+  }
+
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -685,6 +704,7 @@ function createWindow(): void {
       sound?: string | null
       text?: string
       forward?: boolean
+      side?: 'left' | 'right'
     }
 
     switch (message.cmd) {
@@ -814,6 +834,9 @@ function createWindow(): void {
       case 'history:close':
         closeHistory()
         break
+      case 'sidebar:toggle':
+        if (payload.side === 'left' || payload.side === 'right') toggleSidebar(payload.side)
+        break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)
         break
@@ -856,7 +879,9 @@ function createWindow(): void {
     zoomIn: () => applyZoom(1),
     zoomOut: () => applyZoom(-1),
     zoomReset: () => applyZoom('reset'),
-    openHistory
+    openHistory,
+    toggleLeftSidebar: () => toggleSidebar('left'),
+    toggleRightSidebar: () => toggleSidebar('right')
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'

@@ -51,6 +51,18 @@ function onEnter(): void {
 
 <template>
   <div class="toolbar">
+    <button
+      class="nav panel-toggle"
+      :class="{ active: store.showLeftSidebar }"
+      aria-label="Toggle left sidebar"
+      title="Toggle left sidebar (Ctrl+B)"
+      @click="store.toggleSidebar('left')"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <line x1="9" y1="4" x2="9" y2="20" />
+      </svg>
+    </button>
     <div class="nav-group">
       <button
         class="nav"
@@ -182,6 +194,18 @@ function onEnter(): void {
           />
         </svg>
       </button>
+      <button
+        class="nav panel-toggle"
+        :class="{ active: store.showRightSidebar }"
+        aria-label="Toggle right sidebar"
+        title="Toggle right sidebar (Ctrl+Alt+B)"
+        @click="store.toggleSidebar('right')"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+          <line x1="15" y1="4" x2="15" y2="20" />
+        </svg>
+      </button>
     </div>
   </div>
 </template>
@@ -219,6 +243,9 @@ function onEnter(): void {
   color: var(--flow-text-2);
   line-height: 1;
   cursor: default;
+}
+.panel-toggle.active {
+  color: var(--accent);
 }
 .nav:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.05);

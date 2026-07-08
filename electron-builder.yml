@@ -13,11 +13,16 @@ asarUnpack:
   - resources/**
 win:
   executableName: Forge
+  target:
+    - nsis
+    - portable
 nsis:
   artifactName: Forge-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+portable:
+  artifactName: Forge-${version}-portable.${ext}
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

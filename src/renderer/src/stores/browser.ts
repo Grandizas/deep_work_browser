@@ -32,6 +32,8 @@ export const useBrowserStore = defineStore('browser', {
     showResume: false,
     resume: null as ResumeInfo | null,
     showSettings: false,
+    showLeftSidebar: true,
+    showRightSidebar: true,
     roles: { essential: [], reference: [], distractions: [] },
     focus: { state: 'idle', endsAt: null, workspaceId: null, paused: false, remainingMs: 0 },
     showCompletion: false,
@@ -75,6 +77,8 @@ export const useBrowserStore = defineStore('browser', {
       this.showResume = next.showResume
       this.resume = next.resume
       this.showSettings = next.showSettings
+      this.showLeftSidebar = next.showLeftSidebar
+      this.showRightSidebar = next.showRightSidebar
       this.roles = next.roles
       this.focus = next.focus
       this.showCompletion = next.showCompletion
@@ -173,6 +177,9 @@ export const useBrowserStore = defineStore('browser', {
     },
     closeHistory(): void {
       send('history:close')
+    },
+    toggleSidebar(side: 'left' | 'right'): void {
+      send('sidebar:toggle', { side })
     },
     queryPalette(query: string): void {
       send('palette:query', { query })
