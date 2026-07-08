@@ -47,6 +47,12 @@ export function initHistory(): void {
       );
       CREATE INDEX IF NOT EXISTS idx_blocks_at ON blocks (blocked_at);
 
+      CREATE TABLE IF NOT EXISTS notes (
+        origin     TEXT PRIMARY KEY,
+        body       TEXT    NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS sessions (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         workspace_id TEXT,
@@ -238,6 +244,45 @@ export function logSession(
   if (!insertSession || !countOverrides) return
   const { n } = countOverrides.get(workspaceId, startedAt, endedAt) as { n: number }
   insertSession.run(workspaceId, startedAt, endedAt, completed ? 1 : 0, n)
+}
+
+// --- Website notes ----------------------------------------------------------
+
+/** The saved note body for an origin, or '' when there's none. */
+export function getNote(origin: string): string {
+  if (!db || !origin) return ''
+  const row = db.prepare(`SELECT body FROM notes WHERE origin = ?`).get(origin) as
+    { body: string } | undefined
+  return row?.body ?? ''
+}
+
+/** Upsert a note for an origin. An empty/whitespace body deletes it. */
+export function setNote(origin: string, body: string): void {
+  if (!db || !origin) return
+  const trimmed = body.trim()
+  if (!trimmed) {
+    db.prepare(`DELETE FROM notes WHERE origin = ?`).run(origin)
+    return
+  }
+  db.prepare(
+    `INSERT INTO notes (origin, body, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(origin) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`
+  ).run(origin, trimmed, Date.now())
+}
+
+/** Whether an origin has a (non-empty) note — drives the URL-bar indicator. */
+export function hasNote(origin: string): boolean {
+  if (!db || !origin) return false
+  return !!db.prepare(`SELECT 1 FROM notes WHERE origin = ?`).get(origin)
+}
+
+/** All notes, most-recently-edited first, for the palette `notes` listing. */
+export function listNotes(): { origin: string; body: string }[] {
+  if (!db) return []
+  return db.prepare(`SELECT origin, body FROM notes ORDER BY updated_at DESC`).all() as {
+    origin: string
+    body: string
+  }[]
 }
 
 export function closeHistory(): void {

@@ -6,7 +6,16 @@ import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
 import { WorkspaceView } from './WorkspaceView'
 import { installAppMenu, type MenuActions } from './menu'
 import { settings } from './settings'
-import { initHistory, logVisit, closeHistory, logSession } from './history'
+import {
+  initHistory,
+  logVisit,
+  closeHistory,
+  logSession,
+  getNote,
+  setNote,
+  hasNote
+} from './history'
+import { originOf } from '../shared/url'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
@@ -30,6 +39,9 @@ const BASE_CHROME_HEIGHT = 88
 const SHELF_HEIGHT = 48
 const PROMPT_HEIGHT = 48
 const BOOKMARKS_HEIGHT = 36
+// Width of the website-notes side panel. Mirrors `.notes-panel { width }` in the
+// renderer so the shrunk tab view lines up with the panel's left edge.
+const NOTES_PANEL_WIDTH = 340
 
 // The menu is global; it acts on whichever window is currently active. With a
 // single window this is just that window's actions.
@@ -76,6 +88,8 @@ function createWindow(): void {
   // Ctrl+K command palette overlay (full-window, hides tabs while open).
   let showPalette = false
   let paletteResults: PaletteResult[] = []
+  // Website-notes side panel — edits the active tab's origin (computed per push).
+  let showNotes = false
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -105,9 +119,12 @@ function createWindow(): void {
   const pushState = (): void => {
     if (chromeView.webContents.isDestroyed()) return
     const view = activeView()
+    const tabState = view ? view.tabs.getState() : { tabs: [], activeTabId: null }
+    const activeUrl = tabState.tabs.find((t) => t.id === tabState.activeTabId)?.url ?? ''
+    const activeOrigin = originOf(activeUrl)
     const state: BrowserState = {
-      tabs: view ? view.tabs.getState().tabs : [],
-      activeTabId: view ? view.tabs.getState().activeTabId : null,
+      tabs: tabState.tabs,
+      activeTabId: tabState.activeTabId,
       downloads: view ? view.downloads.getState() : [],
       permissionRequest: view ? view.permissions.current() : null,
       workspaces: workspaceSummaries(),
@@ -120,6 +137,13 @@ function createWindow(): void {
       showCompletion,
       showPalette,
       paletteResults,
+      showNotes,
+      // The panel edits the active tab's origin; recompute so it follows tab
+      // switches. noteBody is only the initial content — the renderer resets its
+      // textarea when noteOrigin changes, so same-origin pushes never clobber it.
+      noteOrigin: showNotes ? activeOrigin : '',
+      noteBody: showNotes ? getNote(activeOrigin) : '',
+      activeHasNote: hasNote(activeOrigin),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -338,6 +362,19 @@ function createWindow(): void {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
+    if (showNotes) {
+      // Chrome fills the window so it can draw the right-hand notes panel; the
+      // tab view is shrunk to the left column so the page stays live beside it.
+      chromeView.setBounds({ x: 0, y: 0, width, height })
+      const top = chromeHeight()
+      activeView()?.tabs.layout({
+        x: 0,
+        y: top,
+        width: Math.max(0, width - NOTES_PANEL_WIDTH),
+        height: height - top
+      })
+      return
+    }
     chromeView.setBounds({ x: 0, y: 0, width, height: chromeHeight() })
     activeView()?.tabs.layout(contentRegion())
   }
@@ -408,6 +445,34 @@ function createWindow(): void {
     pushState()
   }
 
+  // Website notes (Ctrl+Shift+N): a live side panel — chrome fills the window and
+  // the tab view shrinks to make room, so the page stays visible while you write.
+  const openNotes = (): void => {
+    if (showNotes || showPicker || showSettings || showCompletion || showPalette) return
+    showNotes = true
+    layoutViews()
+    chromeView.webContents.focus()
+    pushState()
+  }
+  const closeNotes = (): void => {
+    if (!showNotes) return
+    showNotes = false
+    layoutViews()
+    activeView()?.show(contentRegion())
+    pushState()
+  }
+  const toggleNotes = (): void => {
+    if (showNotes) closeNotes()
+    else openNotes()
+  }
+  // Autosave from the panel. The origin comes from the renderer so a tab switch
+  // mid-edit can't misfile the note; an empty body deletes it (setNote).
+  const saveNote = (origin: string, body: string): void => {
+    if (!origin) return
+    setNote(origin, body)
+    pushState()
+  }
+
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -421,6 +486,8 @@ function createWindow(): void {
       pattern?: string
       minutes?: number
       query?: string
+      origin?: string
+      body?: string
     }
 
     switch (message.cmd) {
@@ -480,6 +547,17 @@ function createWindow(): void {
       case 'palette:query':
         if (typeof payload.query === 'string') runPaletteQuery(payload.query)
         break
+      case 'notes:toggle':
+        toggleNotes()
+        break
+      case 'notes:close':
+        closeNotes()
+        break
+      case 'notes:save':
+        if (typeof payload.origin === 'string' && typeof payload.body === 'string') {
+          saveNote(payload.origin, payload.body)
+        }
+        break
       case 'focus:start':
         if (typeof payload.minutes === 'number') startFocusSession(payload.minutes)
         break
@@ -530,7 +608,8 @@ function createWindow(): void {
     nextTab: () => activeView()?.tabs.activateAdjacent(1),
     prevTab: () => activeView()?.tabs.activateAdjacent(-1),
     reload: () => activeView()?.tabs.reload(),
-    togglePalette
+    togglePalette,
+    toggleNotes
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'

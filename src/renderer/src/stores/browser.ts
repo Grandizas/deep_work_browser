@@ -27,6 +27,10 @@ export const useBrowserStore = defineStore('browser', {
     showCompletion: false,
     showPalette: false,
     paletteResults: [] as PaletteResult[],
+    showNotes: false,
+    noteOrigin: '',
+    noteBody: '',
+    activeHasNote: false,
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -55,6 +59,10 @@ export const useBrowserStore = defineStore('browser', {
       this.showCompletion = next.showCompletion
       this.showPalette = next.showPalette
       this.paletteResults = next.paletteResults
+      this.showNotes = next.showNotes
+      this.noteOrigin = next.noteOrigin
+      this.noteBody = next.noteBody
+      this.activeHasNote = next.activeHasNote
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -104,6 +112,15 @@ export const useBrowserStore = defineStore('browser', {
     },
     closePalette(): void {
       send('palette:close')
+    },
+    toggleNotes(): void {
+      send('notes:toggle')
+    },
+    closeNotes(): void {
+      send('notes:close')
+    },
+    saveNote(origin: string, body: string): void {
+      send('notes:save', { origin, body })
     },
     queryPalette(query: string): void {
       send('palette:query', { query })

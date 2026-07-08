@@ -134,6 +134,14 @@ export interface BrowserState {
   showPalette: boolean
   /** Ranked palette results for the current query. */
   paletteResults: PaletteResult[]
+  /** When true, show the website-notes side panel (Ctrl+Shift+N). */
+  showNotes: boolean
+  /** Origin (host) the notes panel is editing — follows the active tab. */
+  noteOrigin: string
+  /** Saved note body for `noteOrigin` (the panel's initial textarea content). */
+  noteBody: string
+  /** Whether the active tab's origin has a saved note — drives the URL-bar dot. */
+  activeHasNote: boolean
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -172,6 +180,9 @@ export type Command =
   | 'workspace:session'
   | 'palette:close'
   | 'palette:query'
+  | 'notes:toggle'
+  | 'notes:close'
+  | 'notes:save'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

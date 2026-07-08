@@ -10,6 +10,7 @@ import WorkspacePicker from './components/WorkspacePicker.vue'
 import Settings from './components/Settings.vue'
 import CompletionScreen from './components/CompletionScreen.vue'
 import CommandPalette from './components/CommandPalette.vue'
+import NotesPanel from './components/NotesPanel.vue'
 
 const store = useBrowserStore()
 
@@ -33,13 +34,19 @@ onUnmounted(() => unsubscribe?.())
   <Settings v-else-if="store.showSettings" />
   <CompletionScreen v-else-if="store.showCompletion" />
   <CommandPalette v-else-if="store.showPalette" />
-  <div v-else id="chrome" :style="{ '--accent': accent }">
+  <div
+    v-else
+    id="chrome"
+    :class="{ 'notes-open': store.showNotes }"
+    :style="{ '--accent': accent }"
+  >
     <TabBar />
     <Toolbar />
     <Bookmarks v-if="store.pinnedSites.length" />
     <PermissionPrompt />
     <Downloads v-if="store.downloads.length" />
   </div>
+  <NotesPanel v-if="store.showNotes" />
 </template>
 
 <style scoped>
@@ -52,5 +59,10 @@ onUnmounted(() => unsubscribe?.())
   background: color-mix(in srgb, var(--accent) 7%, var(--color-background-soft));
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, var(--ev-c-gray-3));
   transition: background 0.25s ease;
+}
+/* With the notes panel open, chrome fills the window (so the tab view shrinks to
+   the left); constrain the strip so the toolbar doesn't run under the panel. */
+#chrome.notes-open {
+  width: calc(100% - 340px);
 }
 </style>

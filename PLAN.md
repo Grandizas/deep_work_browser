@@ -105,7 +105,7 @@ Goal: never touch menus.
 - [x] Ctrl+K overlay in the chrome renderer (this is pure Vue work — your comfort zone)
 - [x] Command registry: static commands + parameterized (`timer 30`, `block youtube`) + fuzzy site jump (searches history + roles + open tabs)
 - [x] Commands dispatch through the same IPC `cmd:*` channel — the palette is just another caller
-- [x] Minimum command set: `timer <min>`, `new <workspace> session`, `block <site>`, `today` (dashboard), workspace names, open-tab switching, history search — (`notes` deferred to Phase 8; gets its palette command when that feature lands)
+- [x] Minimum command set: `timer <min>`, `new <workspace> session`, `block <site>`, `today` (dashboard), `notes`, workspace names, open-tab switching, history search
 
 Done when: you stop using the mouse for navigation.
 
@@ -122,11 +122,11 @@ Done when: the dashboard replaces any urge for a separate stats app.
 
 ## Phase 8 — Website notes
 
-- [ ] SQLite `notes` table keyed by origin (`github.com`), not full URL
-- [ ] Shortcut (e.g. Ctrl+Shift+N) opens a slide-over panel in chrome UI showing notes for the active tab's origin
-- [ ] Plain textarea + autosave. No rich text. Resist the urge.
-- [ ] Note indicator dot on the URL bar when the current site has notes
-- [ ] `notes` command in palette lists all notes
+- [x] SQLite `notes` table keyed by origin (`github.com`), not full URL
+- [x] Shortcut (e.g. Ctrl+Shift+N) opens a slide-over panel in chrome UI showing notes for the active tab's origin
+- [x] Plain textarea + autosave. No rich text. Resist the urge.
+- [x] Note indicator dot on the URL bar when the current site has notes
+- [x] `notes` command in palette lists all notes
 
 ## Phase 9 — Session restore
 

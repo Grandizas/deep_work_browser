@@ -9,6 +9,7 @@ export interface MenuActions {
   prevTab(): void
   reload(): void
   togglePalette(): void
+  toggleNotes(): void
 }
 
 /**
@@ -39,6 +40,11 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
           label: 'Command Palette',
           accelerator: 'CmdOrCtrl+K',
           click: run((a) => a.togglePalette())
+        },
+        {
+          label: 'Notes',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: run((a) => a.toggleNotes())
         },
         { type: 'separator' },
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: run((a) => a.reload()) },
