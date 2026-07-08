@@ -33,6 +33,8 @@ export const useBrowserStore = defineStore('browser', {
     noteOrigin: '',
     noteBody: '',
     activeHasNote: false,
+    ambientSound: null as string | null,
+    ambientDucked: false,
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -67,6 +69,8 @@ export const useBrowserStore = defineStore('browser', {
       this.noteOrigin = next.noteOrigin
       this.noteBody = next.noteBody
       this.activeHasNote = next.activeHasNote
+      this.ambientSound = next.ambientSound
+      this.ambientDucked = next.ambientDucked
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -125,6 +129,9 @@ export const useBrowserStore = defineStore('browser', {
     },
     saveNote(origin: string, body: string): void {
       send('notes:save', { origin, body })
+    },
+    setAmbient(sound: string | null): void {
+      send('ambient:set', { sound })
     },
     queryPalette(query: string): void {
       send('palette:query', { query })
