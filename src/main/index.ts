@@ -17,6 +17,7 @@ import {
   countNotes
 } from './history'
 import { originOf } from '../shared/url'
+import { initAdblock } from './adblock'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
@@ -836,6 +837,7 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
   initHistory()
+  initAdblock()
   workspaces.init()
   roles.init()
   // Log every finished focus session to SQLite (app-level, not per-window).
