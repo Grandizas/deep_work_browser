@@ -14,7 +14,9 @@ import type { BrowserState, TabState } from '../shared/types'
 
 interface Tab {
   id: string
-  view: WebContentsView
+  // The tab's WebContentsView, or null for a lazily-restored placeholder that
+  // hasn't been activated yet — no view and no renderer are created until then.
+  view: WebContentsView | null
   favicon: string | null
   // When a load fails we show a local error page; this remembers the URL the
   // user actually tried so the address bar keeps showing it (not the data URL).
@@ -29,9 +31,9 @@ interface Tab {
   // True while showing the internal new-tab dashboard (a baked data URL). The
   // address bar shows empty for these so a new tab is ready to type into.
   isHome: boolean
-  // A restored-but-not-yet-loaded tab: its saved URL, loaded on first activation
-  // (lazy session restore). null once loaded/loading. The tab strip shows the URL
-  // meanwhile so the session looks fully restored without the cost of loading it.
+  // A restored-but-not-yet-materialized tab: its saved URL. While set, `view` is
+  // null (no WebContentsView, no renderer). First activation builds the view and
+  // loads this. The strip shows the URL meanwhile so the session looks restored.
   pendingUrl: string | null
 }
 
@@ -78,26 +80,19 @@ export class TabManager {
    * bypass it (e.g. restoring a session's tabs). Returns the new tab id.
    */
   create(url = 'about:blank', block = true): string {
-    const tab = this.makeTab()
+    const tab = this.newTabRecord()
+    this.materialize(tab)
     this.loadInTab(tab, url, block)
     this.activate(tab.id)
     return tab.id
   }
 
-  // Create the WebContentsView + Tab record and wire its events, without loading
-  // or activating anything. Shared by create() and createLazy().
-  private makeTab(): Tab {
-    const view = new WebContentsView({
-      webPreferences: {
-        partition: this.partition,
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true
-      }
-    })
+  // A bare Tab record with no view yet. Materialized eagerly by create() or on
+  // first activation for a lazy placeholder.
+  private newTabRecord(): Tab {
     const tab: Tab = {
       id: nextId(),
-      view,
+      view: null,
       favicon: null,
       errorUrl: null,
       blockedUrl: null,
@@ -106,20 +101,33 @@ export class TabManager {
       pendingUrl: null
     }
     this.tabs.push(tab)
-    this.window.contentView.addChildView(view)
-    this.wireEvents(tab)
     return tab
   }
 
+  // Build the tab's WebContentsView (spawning its renderer) and wire its events.
+  // No-op if already materialized. This is the per-tab cost lazy restore defers.
+  private materialize(tab: Tab): void {
+    if (tab.view) return
+    tab.view = new WebContentsView({
+      webPreferences: {
+        partition: this.partition,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
+    })
+    this.window.contentView.addChildView(tab.view)
+    this.wireEvents(tab)
+  }
+
   /**
-   * Create a restored tab without loading it. It stays blank (hidden) until first
-   * activated, at which point `activate` loads its pending URL — so restoring a
-   * big session is cheap and only the visible tab pays the load cost.
+   * Create a restored tab as a pure placeholder — no WebContentsView, no
+   * renderer — until it's first activated. Restoring a big session is cheap:
+   * only the visible tab pays for a view; the rest cost one record each.
    */
   private createLazy(url: string): string {
-    const tab = this.makeTab()
+    const tab = this.newTabRecord()
     tab.pendingUrl = url
-    tab.view.setVisible(false)
     return tab.id
   }
 
@@ -141,6 +149,7 @@ export class TabManager {
   // A blank target (empty or about:blank — the latter is how a persisted home
   // tab round-trips) loads the internal new-tab dashboard instead.
   private loadInTab(tab: Tab, url: string, check: boolean): void {
+    if (!tab.view) return
     // Was this exact URL already the one being blocked? Then this is a reload of
     // the interstitial, not a fresh attempt — don't double-count the block.
     const reblockingSame = tab.blockedUrl === url
@@ -161,6 +170,7 @@ export class TabManager {
   }
 
   private wireEvents(tab: Tab): void {
+    if (!tab.view) return
     const wc = tab.view.webContents
     const changed = (): void => this.onChange()
 
@@ -278,18 +288,20 @@ export class TabManager {
     const target = this.tabs.find((t) => t.id === id)
     if (!target) return
     this.activeId = id
+    // First activation of a lazy placeholder: build its view now and load its URL.
+    if (!target.view) {
+      this.materialize(target)
+      const url = target.pendingUrl ?? 'about:blank'
+      target.pendingUrl = null
+      this.loadInTab(target, url, false)
+    }
     for (const tab of this.tabs) {
+      if (!tab.view) continue // placeholders have no view to show
       const isActive = tab.id === id
       tab.view.setVisible(isActive)
       if (isActive) tab.view.setBounds(this.bounds)
     }
-    // First time a lazily-restored tab is shown: load its saved URL now.
-    if (target.pendingUrl !== null) {
-      const url = target.pendingUrl
-      target.pendingUrl = null
-      this.loadInTab(target, url, false)
-    }
-    this.active?.view.webContents.focus()
+    this.active?.view?.webContents.focus()
     this.onChange()
   }
 
@@ -297,8 +309,10 @@ export class TabManager {
     const idx = this.tabs.findIndex((t) => t.id === id)
     if (idx === -1) return
     const [tab] = this.tabs.splice(idx, 1)
-    this.window.contentView.removeChildView(tab.view)
-    if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close()
+    if (tab.view) {
+      this.window.contentView.removeChildView(tab.view)
+      if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close()
+    }
 
     if (this.activeId !== id) {
       this.onChange()
@@ -330,7 +344,7 @@ export class TabManager {
 
   back(): void {
     const tab = this.active
-    if (!tab) return
+    if (!tab?.view) return
     const wc = tab.view.webContents
     if (wc.navigationHistory.canGoBack()) {
       tab.errorUrl = null
@@ -342,7 +356,7 @@ export class TabManager {
 
   forward(): void {
     const tab = this.active
-    if (!tab) return
+    if (!tab?.view) return
     const wc = tab.view.webContents
     if (wc.navigationHistory.canGoForward()) {
       tab.errorUrl = null
@@ -354,7 +368,7 @@ export class TabManager {
 
   reload(): void {
     const tab = this.active
-    if (!tab) return
+    if (!tab?.view) return
     const wc = tab.view.webContents
     // On the interstitial, reload re-checks the blocked URL (still blocked → stays).
     if (tab.blockedUrl) {
@@ -383,41 +397,41 @@ export class TabManager {
   /** Update the region tabs occupy (called on window resize). */
   layout(bounds: Rectangle): void {
     this.bounds = bounds
-    this.active?.view.setBounds(bounds)
+    this.active?.view?.setBounds(bounds)
   }
 
   /** Hide all of this workspace's tabs (on switching away). Views stay alive. */
   hide(): void {
-    for (const tab of this.tabs) tab.view.setVisible(false)
+    for (const tab of this.tabs) tab.view?.setVisible(false)
   }
 
   /** Show this workspace's active tab in `bounds` (on switching to it). */
   show(bounds: Rectangle): void {
     this.bounds = bounds
-    for (const tab of this.tabs) tab.view.setVisible(tab.id === this.activeId)
-    this.active?.view.setBounds(bounds)
-    this.active?.view.webContents.focus()
+    for (const tab of this.tabs) tab.view?.setVisible(tab.id === this.activeId)
+    this.active?.view?.setBounds(bounds)
+    this.active?.view?.webContents.focus()
   }
 
   getState(): Pick<BrowserState, 'tabs' | 'activeTabId'> {
     return {
       activeTabId: this.activeId,
       tabs: this.tabs.map((tab): TabState => {
-        const wc = tab.view.webContents
-        const dead = wc.isDestroyed()
-        // A not-yet-loaded restored tab reports its saved URL + a host-derived
-        // title, so the strip looks fully restored before the tab is opened.
-        if (tab.pendingUrl !== null) {
+        // An unmaterialized placeholder (no view) reports its saved URL + a
+        // host-derived title, so the strip looks fully restored before it opens.
+        if (!tab.view) {
           return {
             id: tab.id,
-            url: tab.pendingUrl,
-            title: hostTitle(tab.pendingUrl),
+            url: tab.pendingUrl ?? '',
+            title: hostTitle(tab.pendingUrl ?? ''),
             favicon: null,
             isLoading: false,
             canGoBack: false,
             canGoForward: false
           }
         }
+        const wc = tab.view.webContents
+        const dead = wc.isDestroyed()
         return {
           id: tab.id,
           url: tab.isHome ? '' : (tab.blockedUrl ?? tab.errorUrl ?? (dead ? '' : wc.getURL())),
@@ -433,6 +447,7 @@ export class TabManager {
 
   destroy(): void {
     for (const tab of this.tabs) {
+      if (!tab.view) continue
       this.window.contentView.removeChildView(tab.view)
       if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close()
     }
