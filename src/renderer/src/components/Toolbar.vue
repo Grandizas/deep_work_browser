@@ -128,10 +128,11 @@ function onEnter(): void {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 48px;
-  padding: 0 10px;
-  /* Transparent so the workspace-tinted chrome background shows through. */
+  gap: 10px;
+  height: 54px;
+  flex: 0 0 54px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--flow-line);
   background: transparent;
 }
 

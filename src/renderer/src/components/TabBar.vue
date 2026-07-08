@@ -1,53 +1,89 @@
 <script setup lang="ts">
 import { useBrowserStore } from '../stores/browser'
-import WorkspaceSwitcher from './WorkspaceSwitcher.vue'
 
 const store = useBrowserStore()
 </script>
 
 <template>
-  <div class="tabbar" role="tablist" aria-label="Tabs">
-    <WorkspaceSwitcher />
-    <div
-      v-for="tab in store.tabs"
-      :key="tab.id"
-      class="tab"
-      :class="{ active: tab.id === store.activeTabId }"
-      role="tab"
-      tabindex="0"
-      :aria-selected="tab.id === store.activeTabId"
-      :title="tab.title || tab.url"
-      @click="store.activateTab(tab.id)"
-      @keydown.enter="store.activateTab(tab.id)"
-      @keydown.space.prevent="store.activateTab(tab.id)"
-    >
-      <img v-if="tab.favicon" class="favicon" :src="tab.favicon" alt="" />
-      <span v-else class="favicon placeholder" />
-      <span class="label">{{ tab.title || tab.url || 'New Tab' }}</span>
-      <button
-        class="close"
-        aria-label="Close tab"
-        title="Close tab"
-        @click.stop="store.closeTab(tab.id)"
+  <div class="tabbar">
+    <div class="pill" role="tablist" aria-label="Tabs">
+      <div
+        v-for="tab in store.tabs"
+        :key="tab.id"
+        class="tab"
+        :class="{ active: tab.id === store.activeTabId }"
+        role="tab"
+        tabindex="0"
+        :aria-selected="tab.id === store.activeTabId"
+        :title="tab.title || tab.url"
+        @click="store.activateTab(tab.id)"
+        @keydown.enter="store.activateTab(tab.id)"
       >
-        ×
+        <img v-if="tab.favicon" class="fav" :src="tab.favicon" alt="" />
+        <span v-else class="fav dot" />
+        <span class="label">{{ tab.title || tab.url || 'New Tab' }}</span>
+        <button
+          v-if="tab.id === store.activeTabId"
+          class="close"
+          aria-label="Close tab"
+          title="Close tab"
+          @click.stop="store.closeTab(tab.id)"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+          >
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <button class="newtab" aria-label="New tab" title="New tab" @click="store.newTab()">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
       </button>
     </div>
-    <button class="newtab" aria-label="New tab" title="New tab" @click="store.newTab()">+</button>
   </div>
 </template>
 
 <style scoped>
 .tabbar {
+  height: 52px;
+  flex: 0 0 52px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+}
+.pill {
+  display: flex;
+  align-items: center;
   gap: 4px;
-  height: 40px;
-  padding: 6px 8px 0;
+  max-width: 100%;
+  padding: 5px;
+  border-radius: 14px;
+  background: rgba(14, 15, 20, 0.72);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid var(--flow-line-2);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
   overflow-x: auto;
   scrollbar-width: none;
 }
-.tabbar::-webkit-scrollbar {
+.pill::-webkit-scrollbar {
   display: none;
 }
 
@@ -55,81 +91,67 @@ const store = useBrowserStore()
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 100px;
-  max-width: 200px;
-  height: 34px;
-  padding: 0 8px 0 10px;
-  border-radius: 8px 8px 0 0;
-  background: transparent;
-  color: var(--ev-c-text-2);
+  padding: 6px 12px;
+  border-radius: 10px;
   cursor: default;
-  font-size: 12px;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
 }
 .tab:hover {
-  background: var(--color-background-mute);
+  background: rgba(255, 255, 255, 0.04);
 }
 .tab.active {
-  background: color-mix(in srgb, var(--accent, transparent) 16%, var(--color-background));
-  color: var(--color-text);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  padding: 5px 11px;
 }
-.tab:focus-visible {
-  outline: 2px solid var(--accent, var(--ev-c-gray-1));
-  outline-offset: -2px;
-}
-
-.favicon {
+.fav {
   width: 14px;
   height: 14px;
+  border-radius: 4px;
   flex-shrink: 0;
-  border-radius: 3px;
 }
-.favicon.placeholder {
-  background: var(--ev-c-gray-2);
+.fav.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--flow-text-3);
 }
-
+.tab.active .fav.dot {
+  background: var(--accent);
+}
 .label {
-  flex: 1;
+  font-size: 12.5px;
+  color: var(--flow-text-2);
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
+.tab.active .label {
+  color: #eceefb;
+  font-weight: 600;
+}
 .close {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
   display: grid;
   place-items: center;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  font-size: 15px;
-  line-height: 1;
+  color: #8b93d6;
   cursor: default;
-  opacity: 0.6;
 }
 .close:hover {
-  background: var(--ev-c-gray-2);
-  opacity: 1;
+  color: #eceefb;
 }
-
 .newtab {
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  margin-bottom: 3px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ev-c-text-2);
-  font-size: 18px;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--flow-text-3);
   cursor: default;
 }
 .newtab:hover {
-  background: var(--color-background-mute);
-  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--flow-text);
 }
 </style>
