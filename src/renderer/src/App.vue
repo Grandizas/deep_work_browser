@@ -38,7 +38,7 @@ onUnmounted(() => unsubscribe?.())
   <HistoryView v-else-if="store.showHistory" />
   <CommandPalette v-else-if="store.showPalette" />
   <div v-else id="flow">
-    <LeftSidebar />
+    <LeftSidebar v-if="store.showLeftSidebar" />
     <main class="flow-center">
       <Toolbar />
       <TabBar />
@@ -50,7 +50,7 @@ onUnmounted(() => unsubscribe?.())
            hole exactly (see contentRegion in index.ts). -->
       <div class="flow-content"></div>
     </main>
-    <RightSidebar />
+    <RightSidebar v-if="store.showRightSidebar" />
   </div>
   <AmbientAudio />
 </template>

@@ -15,6 +15,8 @@ export interface MenuActions {
   zoomOut(): void
   zoomReset(): void
   openHistory(): void
+  toggleLeftSidebar(): void
+  toggleRightSidebar(): void
 }
 
 /**
@@ -41,6 +43,17 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
     {
       label: 'View',
       submenu: [
+        {
+          label: 'Toggle Left Sidebar',
+          accelerator: 'CmdOrCtrl+B',
+          click: run((a) => a.toggleLeftSidebar())
+        },
+        {
+          label: 'Toggle Right Sidebar',
+          accelerator: 'CmdOrCtrl+Alt+B',
+          click: run((a) => a.toggleRightSidebar())
+        },
+        { type: 'separator' },
         {
           label: 'Command Palette',
           accelerator: 'CmdOrCtrl+K',

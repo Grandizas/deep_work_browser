@@ -150,6 +150,10 @@ export interface BrowserState {
   showSettings: boolean
   /** Global website roles, shown/edited in the settings screen. */
   roles: RolesConfig
+  /** Whether the left (workspaces/focus) sidebar is shown. Persisted. */
+  showLeftSidebar: boolean
+  /** Whether the right (notes) sidebar is shown. Persisted. */
+  showRightSidebar: boolean
   /** Current focus-session state (timer lives in main). */
   focus: FocusSnapshot
   /** When true, show the full-window 🎉 focus-complete / break screen. */
@@ -235,6 +239,7 @@ export type Command =
   | 'history:open'
   | 'history:query'
   | 'history:close'
+  | 'sidebar:toggle'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {
