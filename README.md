@@ -63,6 +63,8 @@ Prebuilt Windows binaries are on the [**Releases**](https://github.com/Grandizas
 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom in / out / reset     |
 | `Ctrl+B` / `Ctrl+Alt+B`        | Toggle left / right sidebar |
 
+> On macOS, use `Cmd` wherever these say `Ctrl` (e.g. `Cmd+B` / `Cmd+Alt+B` for the sidebars) — History is the one exception, mapped to `Cmd+Y`.
+
 ## Tech stack
 
 - [Electron](https://www.electronjs.org/) — `BaseWindow` + `WebContentsView` architecture, one isolated session partition per workspace

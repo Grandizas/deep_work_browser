@@ -675,13 +675,14 @@ function createWindow(): void {
     pushState()
   }
 
-  // Show/hide a sidebar to widen the page area. Persisted; re-lays the tab view.
+  // Show/hide a sidebar to widen the page area. Persisted. layoutViews() re-bounds
+  // the (visible) tab when browsing and leaves it hidden if a full-window modal is
+  // open — so we must NOT force-show the tab here (it would draw over the modal).
   const toggleSidebar = (side: 'left' | 'right'): void => {
     if (side === 'left') showLeftSidebar = !showLeftSidebar
     else showRightSidebar = !showRightSidebar
     settings.setSidebars({ left: showLeftSidebar, right: showRightSidebar })
     layoutViews()
-    activeView()?.show(contentRegion())
     pushState()
   }
 
