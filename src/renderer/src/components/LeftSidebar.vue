@@ -59,7 +59,7 @@ const isFocus = computed(() => store.focus.state !== 'idle')
           <path d="M3 13c2.5-5 5.5 5 9 0s6.5-5 9 0" />
         </svg>
       </div>
-      <span class="word">Flow</span>
+      <span class="word">Forge</span>
       <button class="kbd" title="Command palette (Ctrl+K)" @click="store.openPalette()">⌘K</button>
     </div>
 
