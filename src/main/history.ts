@@ -96,17 +96,23 @@ export function logVisit(url: string, title: string, workspaceId: string | null)
   insertVisit.run(url, title || null, workspaceId, Date.now())
 }
 
+// Escape LIKE wildcards (% _) and the escape char itself so a user searching for
+// e.g. "50%" or "test_1" matches literally. Paired with `ESCAPE '\'` in queries.
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => '\\' + c)
+}
+
 /** Recent distinct history entries whose url or title matches `query`. */
 export function searchHistory(
   query: string,
   limit: number
 ): { url: string; title: string | null }[] {
   if (!db || !query) return []
-  const like = `%${query}%`
+  const like = `%${escapeLike(query)}%`
   return db
     .prepare(
       `SELECT url, title, MAX(visited_at) AS v FROM history
-       WHERE url LIKE ? OR title LIKE ?
+       WHERE url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\'
        GROUP BY url ORDER BY v DESC LIMIT ?`
     )
     .all(like, like, limit) as { url: string; title: string | null }[]
@@ -119,11 +125,11 @@ export function searchHistory(
 export function queryHistory(workspaceId: string, query: string, limit: number): HistoryEntry[] {
   if (!db) return []
   if (query) {
-    const like = `%${query}%`
+    const like = `%${escapeLike(query)}%`
     return db
       .prepare(
         `SELECT url, title, MAX(visited_at) AS visitedAt FROM history
-         WHERE workspace_id = ? AND (url LIKE ? OR title LIKE ?)
+         WHERE workspace_id = ? AND (url LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\')
          GROUP BY url ORDER BY visitedAt DESC LIMIT ?`
       )
       .all(workspaceId, like, like, limit) as HistoryEntry[]

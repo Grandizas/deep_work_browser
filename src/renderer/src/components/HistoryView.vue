@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useBrowserStore } from '../stores/browser'
 
 const store = useBrowserStore()
@@ -28,6 +28,7 @@ function when(ms: number): string {
 }
 
 onMounted(() => input.value?.focus())
+onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>

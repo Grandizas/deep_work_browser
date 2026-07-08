@@ -40,6 +40,10 @@ interface Tab {
   // Activation order (higher = more recent), for evicting the least-recently-used
   // background tab when the live-view cap is exceeded.
   lastActive: number
+  // When a tab showing the interstitial is discarded, its pendingUrl is the
+  // BLOCKED destination — re-run the block check on re-materialization so the
+  // distraction doesn't silently load. (Session-restored tabs stay false.)
+  recheckOnRestore: boolean
 }
 
 let tabSeq = 0
@@ -115,7 +119,8 @@ export class TabManager {
       isHome: false,
       pendingUrl: null,
       audible: false,
-      lastActive: 0
+      lastActive: 0,
+      recheckOnRestore: false
     }
     this.tabs.push(tab)
     return tab
@@ -332,8 +337,10 @@ export class TabManager {
     if (!target.view) {
       this.materialize(target)
       const url = target.pendingUrl ?? 'about:blank'
+      const recheck = target.recheckOnRestore
       target.pendingUrl = null
-      this.loadInTab(target, url, false)
+      target.recheckOnRestore = false
+      this.loadInTab(target, url, recheck)
     }
     target.lastActive = ++this.activateCounter
     for (const tab of this.tabs) {
@@ -371,6 +378,9 @@ export class TabManager {
     const url = tab.isHome
       ? ''
       : (tab.blockedUrl ?? tab.errorUrl ?? (wc.isDestroyed() ? '' : wc.getURL()))
+    // If it was on the interstitial, the saved URL is the blocked site — re-check
+    // it on restore so the distraction doesn't come back unblocked.
+    tab.recheckOnRestore = tab.blockedUrl !== null
     this.window.contentView.removeChildView(tab.view)
     if (!wc.isDestroyed()) wc.close()
     tab.view = null

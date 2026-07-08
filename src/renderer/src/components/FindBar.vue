@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useBrowserStore } from '../stores/browser'
 
 const store = useBrowserStore()
@@ -27,6 +27,9 @@ function enter(e: KeyboardEvent): void {
 onMounted(() => {
   input.value?.focus()
 })
+// Cancel a pending search so closing the bar (Esc) can't re-highlight the page
+// after it's gone. Main clears highlights via stopFindInPage on find:close.
+onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>

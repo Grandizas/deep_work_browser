@@ -57,7 +57,13 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
         { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: run((a) => a.zoomOut()) },
         { label: 'Reset Zoom', accelerator: 'CmdOrCtrl+0', click: run((a) => a.zoomReset()) },
         { type: 'separator' },
-        { label: 'History', accelerator: 'CmdOrCtrl+H', click: run((a) => a.openHistory()) },
+        {
+          // Cmd+H is macOS "Hide Application" — use Cmd+Y there (Chrome's history
+          // shortcut) and Ctrl+H on Windows/Linux.
+          label: 'History',
+          accelerator: process.platform === 'darwin' ? 'Cmd+Y' : 'Ctrl+H',
+          click: run((a) => a.openHistory())
+        },
         { type: 'separator' },
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: run((a) => a.reload()) },
         {
