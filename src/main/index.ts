@@ -70,6 +70,7 @@ function createWindow(): void {
     // Only restore position if we have one saved; otherwise let the OS center it.
     ...(bounds.x !== undefined && bounds.y !== undefined ? { x: bounds.x, y: bounds.y } : {}),
     show: false,
+    title: 'Forge',
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {})
   })
@@ -899,7 +900,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.forge.browser')
 
   initHistory()
   initAdblock()
