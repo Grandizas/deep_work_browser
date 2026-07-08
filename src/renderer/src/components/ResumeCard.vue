@@ -14,7 +14,9 @@ function plural(n: number, word: string): string {
 const timer = computed(() => {
   const f = info.value?.focus
   if (!f) return null
-  const total = Math.round(f.remainingMs / 1000)
+  // Clamp: a session whose end passed before state updated has negative
+  // remainingMs, which would render as "-1:-59".
+  const total = Math.max(0, Math.round(f.remainingMs / 1000))
   const mm = String(Math.floor(total / 60)).padStart(2, '0')
   const ss = String(total % 60).padStart(2, '0')
   const label = f.state === 'break' ? 'Break' : f.paused ? 'Focus paused' : 'Focus'
