@@ -1,5 +1,6 @@
 import { app, BaseWindow, WebContentsView, ipcMain, Menu, type Rectangle } from 'electron'
 import { join } from 'path'
+import { autoUpdater } from 'electron-updater'
 import { electronApp, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { IPC, type BrowserState, type CommandMessage } from '../shared/types'
@@ -896,6 +897,14 @@ app.whenReady().then(() => {
   installAppMenu(() => activeActions)
 
   createWindow()
+
+  // Auto-update: check GitHub releases and notify when an update is downloaded.
+  // Only in packaged builds — in dev there's no update feed to hit.
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.error('[updater] check failed:', err)
+    })
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
