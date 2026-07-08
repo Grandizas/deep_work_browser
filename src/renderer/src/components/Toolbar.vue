@@ -83,12 +83,7 @@ function onEnter(): void {
         @blur="onBlur"
         @keyup.enter="onEnter"
       />
-      <span
-        v-if="store.activeHasNote"
-        class="note-dot"
-        title="This site has notes"
-        @click="store.toggleNotes()"
-      />
+      <span v-if="store.activeHasNote" class="note-dot" title="This site has notes" />
     </div>
     <button
       class="nav star"
@@ -182,7 +177,8 @@ function onEnter(): void {
   border-color: var(--accent, var(--ev-c-gray-1));
   background: var(--color-background-soft);
 }
-/* Indicator that the current site has a saved note. Click jumps to the panel. */
+/* Non-interactive indicator that the current site has a saved note. Clicks pass
+   through to the address input; use the 📝 button or Ctrl+Shift+N to open notes. */
 .note-dot {
   position: absolute;
   right: 10px;
@@ -190,7 +186,7 @@ function onEnter(): void {
   height: 8px;
   border-radius: 50%;
   background: var(--accent, #4f8cff);
-  cursor: default;
+  pointer-events: none;
 }
 .notes-btn {
   font-size: 14px;

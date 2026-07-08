@@ -139,7 +139,9 @@ export function computePaletteResults(query: string, ctx: PaletteContext): Palet
     cmd: 'tab:navigate',
     payload: { url: `https://${n.origin}` }
   })
-  if (q && fuzzyMatch(q, 'notes')) {
+  // "not"/"note"/"notes" (a prefix of the keyword) lists everything; a prefix
+  // gate, not fuzzyMatch, so stray subsequences like "s" or "te" don't trigger it.
+  if (q.length >= 3 && 'notes'.startsWith(q)) {
     for (const n of listNotes()) out.push(noteResult(n))
   } else if (q) {
     for (const n of listNotes()) {
