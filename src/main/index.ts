@@ -13,14 +13,15 @@ import {
   logSession,
   getNote,
   setNote,
-  hasNote
+  hasNote,
+  countNotes
 } from './history'
 import { originOf } from '../shared/url'
 import { workspaces } from './workspaces'
 import { roles } from './roles'
 import { focus } from './FocusManager'
 import { computePaletteResults } from './palette'
-import type { WorkspaceSummary, RolesConfig, PaletteResult } from '../shared/types'
+import type { WorkspaceSummary, RolesConfig, PaletteResult, ResumeInfo } from '../shared/types'
 
 const ROLE_KEYS: readonly (keyof RolesConfig)[] = ['essential', 'reference', 'distractions']
 
@@ -80,7 +81,10 @@ function createWindow(): void {
   const activeView = (): WorkspaceView | undefined => workspaceViews.get(activeId)
 
   // Start on the workspace picker; no WorkspaceView exists until one is chosen.
-  let showPicker = true
+  // But if the last session left tabs open, offer to resume it first instead.
+  const hasResumableSession = settings.getOpenTabs(activeId).urls.length > 0
+  let showResume = hasResumableSession
+  let showPicker = !hasResumableSession
   // Full-window settings screen (hides the active tabs while open).
   let showSettings = false
   // Full-window focus-complete / break celebration screen.
@@ -115,6 +119,21 @@ function createWindow(): void {
     return { x: 0, y: top, width, height: height - top }
   }
 
+  // Summarize the last session for the startup resume card: which workspace, how
+  // many tabs, note count, and any paused/running focus timer to pick back up.
+  const resumeInfo = (): ResumeInfo | null => {
+    const ws = workspaces.get(activeId)
+    const saved = settings.getOpenTabs(activeId)
+    if (!ws || saved.urls.length === 0) return null
+    const snap = focus.snapshot()
+    return {
+      workspace: { id: ws.id, name: ws.name, emoji: ws.emoji, themeColor: ws.themeColor },
+      tabCount: saved.urls.length,
+      notesCount: countNotes(),
+      focus: snap.state === 'idle' ? null : snap
+    }
+  }
+
   // Push the active workspace's authoritative state to the chrome renderer.
   const pushState = (): void => {
     if (chromeView.webContents.isDestroyed()) return
@@ -131,6 +150,8 @@ function createWindow(): void {
       activeWorkspaceId: activeId,
       pinnedSites: workspaces.get(activeId)?.pinnedSites ?? [],
       showPicker,
+      showResume,
+      resume: showResume ? resumeInfo() : null,
       showSettings,
       roles: roles.getGlobal(),
       focus: focus.snapshot(),
@@ -169,10 +190,8 @@ function createWindow(): void {
   const restoreTabs = (view: WorkspaceView, workspaceId: string): void => {
     const saved = settings.getOpenTabs(workspaceId)
     if (saved.urls.length > 0) {
-      // Restore without blocking — the user explicitly had these open.
-      const ids = saved.urls.map((url) => view.tabs.create(url, false))
-      const target = ids[saved.activeIndex] ?? ids[0]
-      if (target) view.tabs.activate(target)
+      // Lazy restore: only the active tab loads now; the rest load on activation.
+      view.tabs.restore(saved.urls, saved.activeIndex)
     } else {
       view.tabs.create('https://example.com')
     }
@@ -245,9 +264,20 @@ function createWindow(): void {
     activeId = id
     workspaces.setActiveId(id)
     showPicker = false
+    showResume = false
     ensureView(id)
     layoutViews()
     activeView()?.show(contentRegion())
+    pushState()
+  }
+
+  // Resume card: "Continue" enters the last workspace (lazily restoring its tabs
+  // via ensureView); "Choose a different workspace" falls through to the picker.
+  const resumeSession = (): void => startWorkspace(activeId)
+  const dismissResume = (): void => {
+    if (!showResume) return
+    showResume = false
+    showPicker = true
     pushState()
   }
 
@@ -358,7 +388,7 @@ function createWindow(): void {
   // The picker and settings screens fill the whole window (tabs are hidden).
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showPicker || showSettings || showCompletion || showPalette) {
+    if (showResume || showPicker || showSettings || showCompletion || showPalette) {
       chromeView.setBounds({ x: 0, y: 0, width, height })
       return
     }
@@ -571,6 +601,12 @@ function createWindow(): void {
         break
       case 'workspace:start':
         if (typeof payload.id === 'string') startWorkspace(payload.id)
+        break
+      case 'session:resume':
+        resumeSession()
+        break
+      case 'session:dismiss':
+        dismissResume()
         break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)

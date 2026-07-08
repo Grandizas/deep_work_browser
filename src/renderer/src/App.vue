@@ -11,6 +11,7 @@ import Settings from './components/Settings.vue'
 import CompletionScreen from './components/CompletionScreen.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import NotesPanel from './components/NotesPanel.vue'
+import ResumeCard from './components/ResumeCard.vue'
 
 const store = useBrowserStore()
 
@@ -30,7 +31,8 @@ onUnmounted(() => unsubscribe?.())
 </script>
 
 <template>
-  <WorkspacePicker v-if="store.showPicker" />
+  <ResumeCard v-if="store.showResume" />
+  <WorkspacePicker v-else-if="store.showPicker" />
   <Settings v-else-if="store.showSettings" />
   <CompletionScreen v-else-if="store.showCompletion" />
   <CommandPalette v-else-if="store.showPalette" />

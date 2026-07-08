@@ -29,6 +29,10 @@ interface Tab {
   // True while showing the internal new-tab dashboard (a baked data URL). The
   // address bar shows empty for these so a new tab is ready to type into.
   isHome: boolean
+  // A restored-but-not-yet-loaded tab: its saved URL, loaded on first activation
+  // (lazy session restore). null once loaded/loading. The tab strip shows the URL
+  // meanwhile so the session looks fully restored without the cost of loading it.
+  pendingUrl: string | null
 }
 
 let tabSeq = 0
@@ -74,6 +78,15 @@ export class TabManager {
    * bypass it (e.g. restoring a session's tabs). Returns the new tab id.
    */
   create(url = 'about:blank', block = true): string {
+    const tab = this.makeTab()
+    this.loadInTab(tab, url, block)
+    this.activate(tab.id)
+    return tab.id
+  }
+
+  // Create the WebContentsView + Tab record and wire its events, without loading
+  // or activating anything. Shared by create() and createLazy().
+  private makeTab(): Tab {
     const view = new WebContentsView({
       webPreferences: {
         partition: this.partition,
@@ -89,14 +102,39 @@ export class TabManager {
       errorUrl: null,
       blockedUrl: null,
       overrideSite: null,
-      isHome: false
+      isHome: false,
+      pendingUrl: null
     }
     this.tabs.push(tab)
     this.window.contentView.addChildView(view)
     this.wireEvents(tab)
-    this.loadInTab(tab, url, block)
-    this.activate(tab.id)
+    return tab
+  }
+
+  /**
+   * Create a restored tab without loading it. It stays blank (hidden) until first
+   * activated, at which point `activate` loads its pending URL — so restoring a
+   * big session is cheap and only the visible tab pays the load cost.
+   */
+  private createLazy(url: string): string {
+    const tab = this.makeTab()
+    tab.pendingUrl = url
+    tab.view.setVisible(false)
     return tab.id
+  }
+
+  /**
+   * Restore a saved session's tabs: the active one loads immediately, the rest
+   * lazily (on first activation). Restored URLs bypass the block check — the user
+   * explicitly had them open.
+   */
+  restore(urls: string[], activeIndex: number): void {
+    if (urls.length === 0) return
+    const active = urls[activeIndex] !== undefined ? activeIndex : 0
+    const ids = urls.map((url, i) =>
+      i === active ? this.create(url, false) : this.createLazy(url)
+    )
+    this.activate(ids[active])
   }
 
   // Load a URL into a tab, routing blocked distractions to the interstitial.
@@ -237,12 +275,19 @@ export class TabManager {
   }
 
   activate(id: string): void {
-    if (!this.tabs.some((t) => t.id === id)) return
+    const target = this.tabs.find((t) => t.id === id)
+    if (!target) return
     this.activeId = id
     for (const tab of this.tabs) {
       const isActive = tab.id === id
       tab.view.setVisible(isActive)
       if (isActive) tab.view.setBounds(this.bounds)
+    }
+    // First time a lazily-restored tab is shown: load its saved URL now.
+    if (target.pendingUrl !== null) {
+      const url = target.pendingUrl
+      target.pendingUrl = null
+      this.loadInTab(target, url, false)
     }
     this.active?.view.webContents.focus()
     this.onChange()
@@ -360,6 +405,19 @@ export class TabManager {
       tabs: this.tabs.map((tab): TabState => {
         const wc = tab.view.webContents
         const dead = wc.isDestroyed()
+        // A not-yet-loaded restored tab reports its saved URL + a host-derived
+        // title, so the strip looks fully restored before the tab is opened.
+        if (tab.pendingUrl !== null) {
+          return {
+            id: tab.id,
+            url: tab.pendingUrl,
+            title: hostTitle(tab.pendingUrl),
+            favicon: null,
+            isLoading: false,
+            canGoBack: false,
+            canGoForward: false
+          }
+        }
         return {
           id: tab.id,
           url: tab.isHome ? '' : (tab.blockedUrl ?? tab.errorUrl ?? (dead ? '' : wc.getURL())),
@@ -389,6 +447,16 @@ function escapeHtml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+/** A placeholder tab title for a not-yet-loaded restored tab: its host, or the URL. */
+function hostTitle(url: string): string {
+  if (!url || url === 'about:blank') return ''
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') || url
+  } catch {
+    return url
+  }
 }
 
 /** Build a self-contained data-URL error page (tab views have no preload). */

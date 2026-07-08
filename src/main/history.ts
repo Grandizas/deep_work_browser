@@ -276,6 +276,13 @@ export function hasNote(origin: string): boolean {
   return !!db.prepare(`SELECT 1 FROM notes WHERE origin = ?`).get(origin)
 }
 
+/** Total number of saved notes (for the resume card's "N notes"). */
+export function countNotes(): number {
+  if (!db) return 0
+  const row = db.prepare(`SELECT COUNT(*) AS n FROM notes`).get() as { n: number }
+  return row.n
+}
+
 /** All notes, most-recently-edited first, for the palette `notes` listing. */
 export function listNotes(): { origin: string; body: string }[] {
   if (!db) return []
