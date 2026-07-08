@@ -213,6 +213,9 @@ const timer = computed(() => {
 .btn-primary {
   width: 100%;
   height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 12px;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
