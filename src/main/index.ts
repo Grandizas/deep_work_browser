@@ -256,14 +256,15 @@ function createWindow(): void {
     settings.setOpenTabs(id, { urls, activeIndex })
   }
 
-  // Restore a workspace's persisted tabs, or open a default first tab.
+  // Restore a workspace's persisted tabs, or open the dashboard as the first tab
+  // (a fresh workspace lands on "your day" with the address bar ready to type).
   const restoreTabs = (view: WorkspaceView, workspaceId: string): void => {
     const saved = settings.getOpenTabs(workspaceId)
     if (saved.urls.length > 0) {
       // Lazy restore: only the active tab loads now; the rest load on activation.
       view.tabs.restore(saved.urls, saved.activeIndex)
     } else {
-      view.tabs.create('https://example.com')
+      view.tabs.create() // no URL → the internal new-tab dashboard
     }
   }
 
