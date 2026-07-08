@@ -35,8 +35,6 @@ interface Tab {
   // null (no WebContentsView, no renderer). First activation builds the view and
   // loads this. The strip shows the URL meanwhile so the session looks restored.
   pendingUrl: string | null
-  // True while this tab is playing audio — drives ambient-sound ducking.
-  audible: boolean
 }
 
 let tabSeq = 0
@@ -100,16 +98,10 @@ export class TabManager {
       blockedUrl: null,
       overrideSite: null,
       isHome: false,
-      pendingUrl: null,
-      audible: false
+      pendingUrl: null
     }
     this.tabs.push(tab)
     return tab
-  }
-
-  /** Whether any tab is currently playing audio (for ambient-sound ducking). */
-  anyAudible(): boolean {
-    return this.tabs.some((t) => t.audible)
   }
 
   // Build the tab's WebContentsView (spawning its renderer) and wire its events.
@@ -184,18 +176,7 @@ export class TabManager {
 
     wc.on('did-start-loading', changed)
     wc.on('did-stop-loading', changed)
-    // Audio state for ambient ducking: fade the ambient sound down while a tab
-    // plays audio, back up when it stops. did-navigate clears it (new page).
-    wc.on('media-started-playing', () => {
-      tab.audible = true
-      changed()
-    })
-    wc.on('media-paused', () => {
-      tab.audible = false
-      changed()
-    })
     wc.on('did-navigate', () => {
-      tab.audible = false
       changed()
       this.onNavigate({ url: wc.getURL(), title: wc.getTitle() })
     })

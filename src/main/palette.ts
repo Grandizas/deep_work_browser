@@ -149,38 +149,6 @@ export function computePaletteResults(query: string, ctx: PaletteContext): Palet
     }
   }
 
-  // --- Ambient sounds: type "rain", "wind", "brown", "pink", "silence" ---
-  if (q) {
-    const sounds = [
-      { id: 'rain', title: 'Rain', icon: '🌧' },
-      { id: 'wind', title: 'Wind', icon: '🌬' },
-      { id: 'brown', title: 'Brown noise', icon: '🟤' },
-      { id: 'pink', title: 'Pink noise', icon: '🌸' }
-    ]
-    for (const snd of sounds) {
-      if (fuzzyMatch(q, snd.title.toLowerCase())) {
-        out.push({
-          id: `ambient-${snd.id}`,
-          icon: snd.icon,
-          title: snd.title,
-          subtitle: 'Ambient sound',
-          cmd: 'ambient:set',
-          payload: { sound: snd.id }
-        })
-      }
-    }
-    if (fuzzyMatch(q, 'silence') || fuzzyMatch(q, 'quiet')) {
-      out.push({
-        id: 'ambient-silence',
-        icon: '🔇',
-        title: 'Silence',
-        subtitle: 'Stop ambient sound',
-        cmd: 'ambient:set',
-        payload: { sound: null }
-      })
-    }
-  }
-
   // --- Fuzzy site jump (needs a query) ---
   if (q) {
     for (const t of ctx.tabs) {
