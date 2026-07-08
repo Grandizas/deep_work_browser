@@ -30,13 +30,17 @@ interface AppSettings {
   openTabsByWorkspace: Record<string, OpenTabs>
   // Focus session, persisted so a crash/restart resumes it.
   focusState: FocusPersisted
+  // Per-origin zoom level (Chromium zoom level, not factor), so a site reopens
+  // at the size you left it.
+  zoomByOrigin: Record<string, number>
 }
 
 const defaults: AppSettings = {
   windowBounds: { width: 1200, height: 800 },
   windowMaximized: false,
   openTabsByWorkspace: {},
-  focusState: IDLE_FOCUS
+  focusState: IDLE_FOCUS,
+  zoomByOrigin: {}
 }
 
 // Lazily constructed: electron-store reads the userData path in its constructor,
@@ -63,5 +67,12 @@ export const settings = {
     s().set('openTabsByWorkspace', map)
   },
   getFocusState: (): FocusPersisted => s().get('focusState'),
-  setFocusState: (state: FocusPersisted): void => s().set('focusState', state)
+  setFocusState: (state: FocusPersisted): void => s().set('focusState', state),
+  getZoom: (origin: string): number => s().get('zoomByOrigin')[origin] ?? 0,
+  setZoom: (origin: string, level: number): void => {
+    const map = s().get('zoomByOrigin')
+    if (level === 0) delete map[origin]
+    else map[origin] = level
+    s().set('zoomByOrigin', map)
+  }
 }

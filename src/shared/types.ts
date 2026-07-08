@@ -163,6 +163,8 @@ export interface BrowserState {
   showFind: boolean
   /** Find-in-page match position: 1-based current match and total (0/0 = none). */
   findResult: { current: number; total: number }
+  /** Active tab's zoom as a percentage (100 = default), for the toolbar readout. */
+  zoomPercent: number
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -211,6 +213,9 @@ export type Command =
   | 'find:query'
   | 'find:next'
   | 'find:close'
+  | 'zoom:in'
+  | 'zoom:out'
+  | 'zoom:reset'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

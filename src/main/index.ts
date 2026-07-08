@@ -192,6 +192,8 @@ function createWindow(): void {
       ambientDucked: (lastDucked = anyTabAudible()),
       showFind,
       findResult,
+      // Active tab's zoom as a percentage (100 = default) for the toolbar readout.
+      zoomPercent: Math.round(Math.pow(1.2, view ? view.tabs.getZoom() : 0) * 100),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -253,7 +255,15 @@ function createWindow(): void {
           pushState()
         }
       }
-      view = new WorkspaceView(mainWindow, ws, onChange, contentRegion(), onNavigate, onFound)
+      view = new WorkspaceView(
+        mainWindow,
+        ws,
+        onChange,
+        contentRegion(),
+        onNavigate,
+        onFound,
+        (origin) => settings.getZoom(origin)
+      )
       workspaceViews.set(id, view)
       restoreTabs(view, id)
     }
@@ -584,6 +594,24 @@ function createWindow(): void {
     pushState()
   }
 
+  // Per-site zoom (Chromium zoom levels; factor = 1.2^level). The active tab's
+  // origin remembers its level, re-applied on navigation (see TabManager).
+  const ZOOM_MIN = -3
+  const ZOOM_MAX = 5
+  const applyZoom = (delta: number | 'reset'): void => {
+    const view = activeView()
+    if (!view) return
+    const level =
+      delta === 'reset' ? 0 : Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, view.tabs.getZoom() + delta))
+    view.tabs.setZoom(level)
+    const url = view.tabs
+      .getState()
+      .tabs.find((t) => t.id === view.tabs.getState().activeTabId)?.url
+    const origin = originOf(url ?? '')
+    if (origin) settings.setZoom(origin, level)
+    pushState()
+  }
+
   // Commands: renderer → main. Reject anything not sent by our chrome view —
   // a sandboxed tab page must never be able to drive the browser.
   const onCommand = (event: Electron.IpcMainEvent, message: CommandMessage): void => {
@@ -710,6 +738,15 @@ function createWindow(): void {
       case 'find:close':
         closeFind()
         break
+      case 'zoom:in':
+        applyZoom(1)
+        break
+      case 'zoom:out':
+        applyZoom(-1)
+        break
+      case 'zoom:reset':
+        applyZoom('reset')
+        break
       case 'workspace:pin':
         if (typeof payload.url === 'string') pinSite(payload.url)
         break
@@ -748,7 +785,10 @@ function createWindow(): void {
     reload: () => activeView()?.tabs.reload(),
     togglePalette,
     toggleNotes,
-    openFind
+    openFind,
+    zoomIn: () => applyZoom(1),
+    zoomOut: () => applyZoom(-1),
+    zoomReset: () => applyZoom('reset')
   }
 
   // Flush persisted state while the window and tabs are still alive ('close'

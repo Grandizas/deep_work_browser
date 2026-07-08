@@ -37,6 +37,7 @@ export const useBrowserStore = defineStore('browser', {
     ambientDucked: false,
     showFind: false,
     findResult: { current: 0, total: 0 },
+    zoomPercent: 100,
     focusUrlBarSeq: 0
   }),
   getters: {
@@ -75,6 +76,7 @@ export const useBrowserStore = defineStore('browser', {
       this.ambientDucked = next.ambientDucked
       this.showFind = next.showFind
       this.findResult = next.findResult
+      this.zoomPercent = next.zoomPercent
       this.focusUrlBarSeq = next.focusUrlBarSeq
     },
     newTab(): void {
@@ -145,6 +147,9 @@ export const useBrowserStore = defineStore('browser', {
     },
     closeFind(): void {
       send('find:close')
+    },
+    zoomReset(): void {
+      send('zoom:reset')
     },
     queryPalette(query: string): void {
       send('palette:query', { query })

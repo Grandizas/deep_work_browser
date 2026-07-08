@@ -11,6 +11,9 @@ export interface MenuActions {
   togglePalette(): void
   toggleNotes(): void
   openFind(): void
+  zoomIn(): void
+  zoomOut(): void
+  zoomReset(): void
 }
 
 /**
@@ -48,6 +51,10 @@ export function installAppMenu(getActions: () => MenuActions | null): void {
           click: run((a) => a.toggleNotes())
         },
         { label: 'Find in Page', accelerator: 'CmdOrCtrl+F', click: run((a) => a.openFind()) },
+        { type: 'separator' },
+        { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', click: run((a) => a.zoomIn()) },
+        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: run((a) => a.zoomOut()) },
+        { label: 'Reset Zoom', accelerator: 'CmdOrCtrl+0', click: run((a) => a.zoomReset()) },
         { type: 'separator' },
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: run((a) => a.reload()) },
         {

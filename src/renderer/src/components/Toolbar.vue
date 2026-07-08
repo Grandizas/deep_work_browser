@@ -86,6 +86,15 @@ function onEnter(): void {
       <span v-if="store.activeHasNote" class="note-dot" title="This site has notes" />
     </div>
     <button
+      v-if="store.zoomPercent !== 100"
+      class="nav zoom"
+      aria-label="Reset zoom"
+      title="Reset zoom (Ctrl+0)"
+      @click="store.zoomReset()"
+    >
+      {{ store.zoomPercent }}%
+    </button>
+    <button
       class="nav star"
       :class="{ active: store.isActiveTabPinned }"
       :aria-label="store.isActiveTabPinned ? 'Unpin site' : 'Pin site'"
@@ -145,6 +154,17 @@ function onEnter(): void {
 }
 .nav:disabled {
   opacity: 0.3;
+}
+
+.zoom {
+  width: auto;
+  padding: 0 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ev-c-text-3);
+}
+.zoom:hover {
+  color: var(--color-text);
 }
 
 .star {

@@ -7,7 +7,7 @@ import {
   type WebContents,
   type MenuItemConstructorOptions
 } from 'electron'
-import { toNavigationUrl } from '../shared/url'
+import { toNavigationUrl, originOf } from '../shared/url'
 import { interstitialUrl, parseInterstitialAction } from './interstitial'
 import { siteOf } from './blocking'
 import type { BrowserState, TabState } from '../shared/types'
@@ -71,7 +71,9 @@ export class TabManager {
     // Builds the internal new-tab page (dashboard) as a data URL, on demand.
     private readonly homePage: () => string,
     // Reports find-in-page results (1-based current match, total) for the find bar.
-    private readonly onFound: (current: number, total: number) => void
+    private readonly onFound: (current: number, total: number) => void,
+    // The saved zoom level for an origin, applied to a page after it navigates.
+    private readonly zoomFor: (origin: string) => number
   ) {}
 
   private get active(): Tab | undefined {
@@ -203,6 +205,8 @@ export class TabManager {
     })
     wc.on('did-navigate', () => {
       tab.audible = false
+      // Restore this origin's saved zoom (Chromium resets zoom on cross-origin nav).
+      wc.setZoomLevel(this.zoomFor(originOf(wc.getURL())))
       changed()
       this.onNavigate({ url: wc.getURL(), title: wc.getTitle() })
     })
@@ -410,6 +414,16 @@ export class TabManager {
     } else {
       wc.reload()
     }
+  }
+
+  /** The active tab's current Chromium zoom level (0 = 100%). */
+  getZoom(): number {
+    return this.active?.view?.webContents.getZoomLevel() ?? 0
+  }
+
+  /** Set the active tab's zoom level. */
+  setZoom(level: number): void {
+    this.active?.view?.webContents.setZoomLevel(level)
   }
 
   /** Find-in-page in the active tab. `findNext` steps through existing matches. */
