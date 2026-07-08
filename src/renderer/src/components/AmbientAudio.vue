@@ -20,7 +20,9 @@ function ensureCtx(): void {
   if (ctx) return
   ctx = new AudioContext()
   master = ctx.createGain()
-  master.gain.value = 1
+  // Start at the current duck level: if a tab is already audible when the first
+  // sound begins, the ducked watcher won't fire (value unchanged), so honour it here.
+  master.gain.value = store.ambientDucked ? 0.15 : 1
   master.connect(ctx.destination)
 }
 

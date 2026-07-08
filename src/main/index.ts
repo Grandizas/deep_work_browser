@@ -102,6 +102,9 @@ function createWindow(): void {
   // choice, so a focus session can auto-resume the sound you last picked.
   let ambientSound: string | null = null
   let lastAmbientSound: string | null = null
+  // Last-pushed ambient-duck state, so a background workspace's audio change can
+  // detect a flip and push even though it doesn't otherwise re-render the chrome.
+  let lastDucked = false
 
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
@@ -142,6 +145,10 @@ function createWindow(): void {
     }
   }
 
+  // Whether any tab in ANY workspace is playing audio — ambient ducking is a
+  // global signal, so background workspaces count too.
+  const anyTabAudible = (): boolean => [...workspaceViews.values()].some((v) => v.tabs.anyAudible())
+
   // Push the active workspace's authoritative state to the chrome renderer.
   const pushState = (): void => {
     if (chromeView.webContents.isDestroyed()) return
@@ -175,7 +182,7 @@ function createWindow(): void {
       activeHasNote: hasNote(activeOrigin),
       ambientSound,
       // Duck while any tab in any workspace is playing audio.
-      ambientDucked: [...workspaceViews.values()].some((v) => v.tabs.anyAudible()),
+      ambientDucked: (lastDucked = anyTabAudible()),
       focusUrlBarSeq
     }
     chromeView.webContents.send(IPC.stateUpdate, state)
@@ -223,6 +230,10 @@ function createWindow(): void {
         if (id === activeId) {
           pushState()
           layoutViews()
+        } else if (anyTabAudible() !== lastDucked) {
+          // A background workspace's tab started/stopped audio and that flips
+          // ambient ducking — push so the renderer ducks/unducks in real time.
+          pushState()
         }
         persist()
       }

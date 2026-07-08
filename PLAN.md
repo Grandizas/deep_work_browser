@@ -137,7 +137,7 @@ Done when: the dashboard replaces any urge for a separate stats app.
 ## Phase 10 — Ambient focus
 
 - [x] Ambient loops played in the chrome renderer via Web Audio — **synthesized procedurally** (filtered white/brown/pink noise + LFOs) instead of CC0 samples: Rain, Wind, Brown noise, Pink noise (no binary assets, seamless, no licensing)
-- [x] Volume ducking: watch tab `webContents` `media-started-playing` / `media-paused` → fade ambient down, fade back on silence (wiring verified via state; not exercised with a live audible tab)
+- [x] Volume ducking: watch tab `webContents` `media-started-playing` / `media-paused` → fade ambient down, fade back on silence (verified end-to-end: a playing tab ducks the ambient, pausing un-ducks; background-workspace audio propagates too)
 - [x] Palette commands: `rain`, `wind`, `brown`, `pink`, `silence`
 - [x] Tie to focus sessions: `focus:start` auto-resumes the last-chosen sound
 
