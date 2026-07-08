@@ -155,6 +155,10 @@ export interface BrowserState {
   noteBody: string
   /** Whether the active tab's origin has a saved note — drives the URL-bar dot. */
   activeHasNote: boolean
+  /** Currently-playing ambient sound id (e.g. 'rain'), or null for silence. */
+  ambientSound: string | null
+  /** True when a tab is playing audio, so the renderer fades ambient down. */
+  ambientDucked: boolean
   /**
    * Monotonic counter bumped whenever main wants the renderer to focus the URL
    * bar (e.g. Ctrl+L, new tab). Carried on state so the preload bridge stays at
@@ -198,6 +202,7 @@ export type Command =
   | 'notes:save'
   | 'session:resume'
   | 'session:dismiss'
+  | 'ambient:set'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {
