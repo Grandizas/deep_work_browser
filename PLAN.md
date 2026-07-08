@@ -130,9 +130,9 @@ Done when: the dashboard replaces any urge for a separate stats app.
 
 ## Phase 9 — Session restore
 
-- [ ] On startup (after workspace picker): "Continue yesterday?" card — last workspace, tab count, notes touched, paused timer state
-- [ ] One click restores tabs (lazy-load: create tab entries but only load the active one's URL; load others on activation — keeps startup fast)
-- [ ] Wire in the persisted focus timer from Phase 5
+- [x] On startup: "Continue yesterday?" card — last workspace, tab count, notes touched, paused timer state (shown instead of the picker when a prior session exists; "Choose a different workspace" falls through to the picker)
+- [x] One click restores tabs (lazy-load: create tab entries but only load the active one's URL; load others on activation — keeps startup fast)
+- [x] Wire in the persisted focus timer from Phase 5
 
 ## Phase 10 — Ambient focus
 

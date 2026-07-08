@@ -40,6 +40,15 @@ export interface DashboardStats {
   blockedToday: number
 }
 
+/** Summary of the last session, shown on the startup "Continue yesterday?" card. */
+export interface ResumeInfo {
+  workspace: WorkspaceSummary
+  tabCount: number
+  notesCount: number
+  /** The persisted focus/break session (paused or running), or null if idle. */
+  focus: FocusSnapshot | null
+}
+
 /** A command-palette result row. Selecting it dispatches `cmd` with `payload`. */
 export interface PaletteResult {
   id: string
@@ -122,6 +131,10 @@ export interface BrowserState {
   pinnedSites: string[]
   /** When true, show the "what are you working on?" picker instead of the browser. */
   showPicker: boolean
+  /** When true, show the startup "Continue yesterday?" resume card. */
+  showResume: boolean
+  /** Last-session summary for the resume card, or null when there's nothing to resume. */
+  resume: ResumeInfo | null
   /** When true, show the full-window settings (roles management) screen. */
   showSettings: boolean
   /** Global website roles, shown/edited in the settings screen. */
@@ -183,6 +196,8 @@ export type Command =
   | 'notes:toggle'
   | 'notes:close'
   | 'notes:save'
+  | 'session:resume'
+  | 'session:dismiss'
 
 /** Envelope for every renderer → main command. */
 export interface CommandMessage {

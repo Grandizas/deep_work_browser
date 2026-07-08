@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { BrowserState, Command, PaletteResult } from '../../../shared/types'
+import type { BrowserState, Command, PaletteResult, ResumeInfo } from '../../../shared/types'
 
 function send(cmd: Command, payload?: unknown): void {
   // Payloads pulled from store state are Vue reactive Proxies, which Electron's
@@ -21,6 +21,8 @@ export const useBrowserStore = defineStore('browser', {
     activeWorkspaceId: '',
     pinnedSites: [],
     showPicker: true,
+    showResume: false,
+    resume: null as ResumeInfo | null,
     showSettings: false,
     roles: { essential: [], reference: [], distractions: [] },
     focus: { state: 'idle', endsAt: null, workspaceId: null, paused: false, remainingMs: 0 },
@@ -53,6 +55,8 @@ export const useBrowserStore = defineStore('browser', {
       this.activeWorkspaceId = next.activeWorkspaceId
       this.pinnedSites = next.pinnedSites
       this.showPicker = next.showPicker
+      this.showResume = next.showResume
+      this.resume = next.resume
       this.showSettings = next.showSettings
       this.roles = next.roles
       this.focus = next.focus
@@ -133,6 +137,12 @@ export const useBrowserStore = defineStore('browser', {
     },
     startWorkspace(id: string): void {
       send('workspace:start', { id })
+    },
+    resumeSession(): void {
+      send('session:resume')
+    },
+    dismissResume(): void {
+      send('session:dismiss')
     },
     openSettings(): void {
       send('settings:open')
