@@ -16,7 +16,8 @@ import {
   setNote,
   hasNote,
   countNotes,
-  queryHistory
+  queryHistory,
+  focusedMinutesToday
 } from './history'
 import { originOf } from '../shared/url'
 import { initAdblock } from './adblock'
@@ -43,16 +44,19 @@ function debounce(fn: () => void, ms: number): () => void {
   }
 }
 
-// Height of the chrome UI strip (tab bar + toolbar). A download shelf and a
-// permission prompt each add a row below it, so total chrome height is dynamic.
-const BASE_CHROME_HEIGHT = 88
-const SHELF_HEIGHT = 48
-const PROMPT_HEIGHT = 48
-const BOOKMARKS_HEIGHT = 36
-const FIND_HEIGHT = 44
-// Width of the website-notes side panel. Mirrors `.notes-panel { width }` in the
-// renderer so the shrunk tab view lines up with the panel's left edge.
-const NOTES_PANEL_WIDTH = 340
+// Flow 3-column layout geometry. The chrome renderer fills the whole window and
+// draws the left/right sidebars, top bar, and floating tab bar; the active tab's
+// WebContentsView is inset into the center as a card. These px values MIRROR the
+// renderer's CSS (App.vue), so the card lines up exactly with its rendered hole.
+const FLOW_LEFT = 260 // left sidebar width
+const FLOW_RIGHT = 308 // right sidebar width
+const FLOW_TOPBAR = 54 // nav / address bar row
+const FLOW_TABBAR = 52 // floating tab-bar strip (incl. its top gap)
+const FLOW_PAD = 16 // padding around the content card
+const SHELF_HEIGHT = 48 // download shelf row (center column)
+const PROMPT_HEIGHT = 48 // permission prompt row
+const BOOKMARKS_HEIGHT = 36 // pinned-sites row
+const FIND_HEIGHT = 44 // find-in-page row
 
 // The menu is global; it acts on whichever window is currently active. With a
 // single window this is just that window's actions.
@@ -66,6 +70,7 @@ function createWindow(): void {
     // Only restore position if we have one saved; otherwise let the OS center it.
     ...(bounds.x !== undefined && bounds.y !== undefined ? { x: bounds.x, y: bounds.y } : {}),
     show: false,
+    title: 'Forge',
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {})
   })
@@ -127,26 +132,33 @@ function createWindow(): void {
   // Bumped whenever main asks the renderer to focus the address bar.
   let focusUrlBarSeq = 0
 
-  // Chrome height grows by a row for the active workspace's download shelf and
-  // permission prompt. Tolerant of no active view yet (returns the base height).
-  const chromeHeight = (): number => {
+  // Y offset of the content card within the center column: below the top bar and
+  // tab bar, plus any optional rows (pins / find / downloads / permission).
+  const centerContentTop = (): number => {
     const view = activeView()
-    if (!view) return BASE_CHROME_HEIGHT
     const hasPins = (workspaces.get(activeId)?.pinnedSites.length ?? 0) > 0
     return (
-      BASE_CHROME_HEIGHT +
+      FLOW_TOPBAR +
+      FLOW_TABBAR +
       (hasPins ? BOOKMARKS_HEIGHT : 0) +
       (showFind ? FIND_HEIGHT : 0) +
-      (view.downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
-      (view.permissions.current() ? PROMPT_HEIGHT : 0)
+      (view && view.downloads.getState().length > 0 ? SHELF_HEIGHT : 0) +
+      (view && view.permissions.current() ? PROMPT_HEIGHT : 0)
     )
   }
 
-  // Region tabs occupy: everything below the chrome strip.
+  // The inset region the active tab occupies: the center content card, between
+  // the two sidebars and below the top bar / tab bar, padded on all sides.
   const contentRegion = (): Rectangle => {
     const { width, height } = mainWindow.getContentBounds()
-    const top = chromeHeight()
-    return { x: 0, y: top, width, height: height - top }
+    const x = FLOW_LEFT + FLOW_PAD
+    const y = centerContentTop() + FLOW_PAD
+    return {
+      x,
+      y,
+      width: Math.max(0, width - FLOW_LEFT - FLOW_RIGHT - FLOW_PAD * 2),
+      height: Math.max(0, height - y - FLOW_PAD)
+    }
   }
 
   // Summarize the last session for the startup resume card: which workspace, how
@@ -162,6 +174,19 @@ function createWindow(): void {
       notesCount: countNotes(),
       focus: snap.state === 'idle' ? null : snap
     }
+  }
+
+  // Open-tab count for every workspace (visited ones from their live views,
+  // others from persisted state) — powers the sidebar's per-workspace counts.
+  const workspaceTabCounts = (): Record<string, number> => {
+    const counts: Record<string, number> = {}
+    for (const w of workspaces.getAll()) {
+      const view = workspaceViews.get(w.id)
+      counts[w.id] = view
+        ? view.tabs.getState().tabs.length
+        : settings.getOpenTabs(w.id).urls.length
+    }
+    return counts
   }
 
   // Whether any tab in ANY workspace is playing audio — ambient ducking is a
@@ -182,6 +207,8 @@ function createWindow(): void {
       permissionRequest: view ? view.permissions.current() : null,
       workspaces: workspaceSummaries(),
       activeWorkspaceId: activeId,
+      workspaceTabCounts: workspaceTabCounts(),
+      dailyFocusMinutes: focusedMinutesToday(activeId),
       pinnedSites: workspaces.get(activeId)?.pinnedSites ?? [],
       showPicker,
       showResume,
@@ -193,11 +220,11 @@ function createWindow(): void {
       showPalette,
       paletteResults,
       showNotes,
-      // The panel edits the active tab's origin; recompute so it follows tab
-      // switches. noteBody is only the initial content — the renderer resets its
+      // The right sidebar always edits the active tab's origin, so push it every
+      // time. noteBody is only the initial content — the renderer resets its
       // textarea when noteOrigin changes, so same-origin pushes never clobber it.
-      noteOrigin: showNotes ? activeOrigin : '',
-      noteBody: showNotes ? getNote(activeOrigin) : '',
+      noteOrigin: activeOrigin,
+      noteBody: getNote(activeOrigin),
       activeHasNote: hasNote(activeOrigin),
       ambientSound,
       // Duck while any tab in any workspace is playing audio.
@@ -451,26 +478,15 @@ function createWindow(): void {
 
   // Keep the chrome strip and the active workspace's tab sized to the window.
   // The picker and settings screens fill the whole window (tabs are hidden).
+  // The chrome renderer always fills the window (it draws the whole Flow frame);
+  // the active tab is inset into the center content card. Full-window screens
+  // (picker, settings, palette, history, resume, completion) hide the tab view.
   const layoutViews = (): void => {
     const { width, height } = mainWindow.getContentBounds()
-    if (showResume || showPicker || showSettings || showCompletion || showPalette || showHistory) {
-      chromeView.setBounds({ x: 0, y: 0, width, height })
-      return
-    }
-    if (showNotes) {
-      // Chrome fills the window so it can draw the right-hand notes panel; the
-      // tab view is shrunk to the left column so the page stays live beside it.
-      chromeView.setBounds({ x: 0, y: 0, width, height })
-      const top = chromeHeight()
-      activeView()?.tabs.layout({
-        x: 0,
-        y: top,
-        width: Math.max(0, width - NOTES_PANEL_WIDTH),
-        height: height - top
-      })
-      return
-    }
-    chromeView.setBounds({ x: 0, y: 0, width, height: chromeHeight() })
+    chromeView.setBounds({ x: 0, y: 0, width, height })
+    const modal =
+      showResume || showPicker || showSettings || showCompletion || showPalette || showHistory
+    if (modal) return
     activeView()?.tabs.layout(contentRegion())
   }
   layoutViews()
@@ -724,6 +740,9 @@ function createWindow(): void {
       case 'palette:close':
         closePalette()
         break
+      case 'palette:open':
+        openPalette()
+        break
       case 'palette:query':
         if (typeof payload.query === 'string') runPaletteQuery(payload.query)
         break
@@ -881,7 +900,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.forge.browser')
 
   initHistory()
   initAdblock()

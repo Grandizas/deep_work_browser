@@ -25,6 +25,8 @@ export const useBrowserStore = defineStore('browser', {
     permissionRequest: null,
     workspaces: [],
     activeWorkspaceId: '',
+    workspaceTabCounts: {} as Record<string, number>,
+    dailyFocusMinutes: 0,
     pinnedSites: [],
     showPicker: true,
     showResume: false,
@@ -66,6 +68,8 @@ export const useBrowserStore = defineStore('browser', {
       this.permissionRequest = next.permissionRequest
       this.workspaces = next.workspaces
       this.activeWorkspaceId = next.activeWorkspaceId
+      this.workspaceTabCounts = next.workspaceTabCounts
+      this.dailyFocusMinutes = next.dailyFocusMinutes
       this.pinnedSites = next.pinnedSites
       this.showPicker = next.showPicker
       this.showResume = next.showResume
@@ -128,6 +132,9 @@ export const useBrowserStore = defineStore('browser', {
     openFocusMenu(): void {
       send('focus:menu')
     },
+    startFocus(minutes: number): void {
+      send('focus:start', { minutes })
+    },
     openFocusControlMenu(): void {
       send('focus:control')
     },
@@ -178,6 +185,12 @@ export const useBrowserStore = defineStore('browser', {
     },
     startWorkspace(id: string): void {
       send('workspace:start', { id })
+    },
+    switchWorkspace(id: string): void {
+      send('workspace:switch', { id })
+    },
+    openPalette(): void {
+      send('palette:open')
     },
     resumeSession(): void {
       send('session:resume')

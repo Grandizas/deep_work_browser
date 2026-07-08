@@ -82,8 +82,10 @@ onBeforeUnmount(() => clearTimeout(timer))
   padding: 28px 0 12px;
 }
 h1 {
-  font-size: 22px;
-  font-weight: 600;
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   color: var(--color-text);
   margin: 0;
 }

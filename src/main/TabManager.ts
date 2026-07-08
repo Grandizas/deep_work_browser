@@ -143,6 +143,9 @@ export class TabManager {
         sandbox: true
       }
     })
+    // Round the inset page card's corners where the Electron version supports it.
+    const rounded = tab.view as unknown as { setBorderRadius?: (r: number) => void }
+    rounded.setBorderRadius?.(14)
     this.window.contentView.addChildView(tab.view)
     this.wireEvents(tab)
   }

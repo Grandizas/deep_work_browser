@@ -23,6 +23,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@fontsource/hanken-grotesk": "^5.2.8",
+    "@fontsource/instrument-serif": "^5.2.8",
     "@ghostery/adblocker-electron": "^2.18.1",
     "better-sqlite3": "^12.11.1",
     "electron-store": "^8.2.0",

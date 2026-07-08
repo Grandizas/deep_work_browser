@@ -134,6 +134,10 @@ export interface BrowserState {
   permissionRequest: PermissionRequest | null
   workspaces: WorkspaceSummary[]
   activeWorkspaceId: string
+  /** Open-tab count per workspace id (for the sidebar), including unvisited ones. */
+  workspaceTabCounts: Record<string, number>
+  /** Focused minutes logged today in the active workspace (Daily Focus meter). */
+  dailyFocusMinutes: number
   /** The active workspace's pinned site URLs (its bookmarks row). */
   pinnedSites: string[]
   /** When true, show the "what are you working on?" picker instead of the browser. */
@@ -212,6 +216,7 @@ export type Command =
   | 'focus:dismiss'
   | 'workspace:switch'
   | 'workspace:session'
+  | 'palette:open'
   | 'palette:close'
   | 'palette:query'
   | 'notes:toggle'

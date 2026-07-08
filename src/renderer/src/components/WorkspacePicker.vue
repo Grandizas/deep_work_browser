@@ -6,7 +6,17 @@ const store = useBrowserStore()
 
 <template>
   <div class="picker">
+    <div class="brand">
+      <div class="mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round">
+          <path d="M3 13c2.5-5 5.5 5 9 0s6.5-5 9 0" />
+        </svg>
+      </div>
+      <span class="word">Forge</span>
+    </div>
+
     <h1 class="prompt">What are you working on today?</h1>
+
     <div class="grid">
       <button
         v-for="w in store.workspaces"
@@ -15,6 +25,7 @@ const store = useBrowserStore()
         :style="{ '--card-accent': w.themeColor }"
         @click="store.startWorkspace(w.id)"
       >
+        <span class="dot" />
         <span class="emoji">{{ w.emoji }}</span>
         <span class="name">{{ w.name }}</span>
       </button>
@@ -29,16 +40,38 @@ const store = useBrowserStore()
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 40px;
-  background: var(--color-background);
+  gap: 32px;
+  background: var(--flow-app);
+  background-image: radial-gradient(circle at 50% 8%, rgba(129, 140, 248, 0.08), transparent 45%);
   user-select: none;
 }
 
-.prompt {
-  font-size: 26px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 20px rgba(129, 140, 248, 0.45);
+}
+.word {
+  font-size: 20px;
   font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
+}
+
+.prompt {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 44px;
+  letter-spacing: -0.01em;
+  color: var(--flow-text);
 }
 
 .grid {
@@ -48,37 +81,44 @@ const store = useBrowserStore()
 }
 
 .card {
-  /* Default so tooling resolves var(--card-accent); the inline :style binding
-     overrides it per card with the workspace's themeColor. */
-  --card-accent: #4f8cff;
+  --card-accent: #818cf8;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  width: 150px;
-  height: 120px;
-  border: 1px solid var(--ev-c-gray-3);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--card-accent) 6%, var(--color-background-soft));
-  color: var(--color-text);
+  width: 156px;
+  height: 128px;
+  border: 1px solid var(--flow-line-2);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--card-accent) 6%, var(--flow-panel));
+  color: var(--flow-text);
   cursor: default;
   transition:
-    transform 0.12s ease,
-    border-color 0.12s ease,
-    background 0.12s ease;
+    transform 0.14s ease,
+    border-color 0.14s ease,
+    background 0.14s ease;
 }
 .card:hover {
   transform: translateY(-3px);
   border-color: var(--card-accent);
-  background: color-mix(in srgb, var(--card-accent) 14%, var(--color-background-soft));
+  background: color-mix(in srgb, var(--card-accent) 14%, var(--flow-panel));
 }
-
+.dot {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--card-accent);
+  box-shadow: 0 0 10px var(--card-accent);
+}
 .emoji {
   font-size: 34px;
   line-height: 1;
 }
-
 .name {
   font-size: 14px;
   font-weight: 600;

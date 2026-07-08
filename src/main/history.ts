@@ -211,6 +211,18 @@ function topOrigins(urls: string[], limit: number): { origin: string; visits: nu
     .slice(0, limit)
 }
 
+/** Minutes of completed focus today in a workspace (cheap; for the sidebar meter). */
+export function focusedMinutesToday(workspaceId: string): number {
+  if (!db) return 0
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(ended_at - started_at), 0) AS ms FROM sessions
+       WHERE completed = 1 AND workspace_id = ? AND started_at >= ?`
+    )
+    .get(workspaceId, startOfLocalDay(0)) as { ms: number }
+  return Math.round(row.ms / 60_000)
+}
+
 /**
  * Snapshot the day's stats for one workspace's new-tab dashboard. Every query
  * filters by workspace_id so each workspace sees only its own numbers — the same

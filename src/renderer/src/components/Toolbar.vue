@@ -51,76 +51,138 @@ function onEnter(): void {
 
 <template>
   <div class="toolbar">
-    <button
-      class="nav"
-      aria-label="Back"
-      title="Back"
-      :disabled="!store.activeTab?.canGoBack"
-      @click="store.back()"
-    >
-      ‹
-    </button>
-    <button
-      class="nav"
-      aria-label="Forward"
-      title="Forward"
-      :disabled="!store.activeTab?.canGoForward"
-      @click="store.forward()"
-    >
-      ›
-    </button>
-    <button class="nav" aria-label="Reload" title="Reload" @click="store.reload()">⟳</button>
-    <div class="url-wrap">
-      <input
-        ref="urlInput"
-        v-model="draft"
-        class="url"
-        type="text"
-        spellcheck="false"
-        autocomplete="off"
-        placeholder="Search or enter address"
-        @focus="onFocus"
-        @blur="onBlur"
-        @keyup.enter="onEnter"
-      />
-      <span v-if="store.activeHasNote" class="note-dot" title="This site has notes" />
+    <div class="nav-group">
+      <button
+        class="nav"
+        aria-label="Back"
+        title="Back"
+        :disabled="!store.activeTab?.canGoBack"
+        @click="store.back()"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M15 6l-6 6 6 6" />
+        </svg>
+      </button>
+      <button
+        class="nav"
+        aria-label="Forward"
+        title="Forward"
+        :disabled="!store.activeTab?.canGoForward"
+        @click="store.forward()"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
+      <button class="nav" aria-label="Reload" title="Reload" @click="store.reload()">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M20 11a8 8 0 1 0-.7 4" />
+          <path d="M20 4v5h-5" />
+        </svg>
+      </button>
     </div>
-    <button
-      v-if="store.zoomPercent !== 100"
-      class="nav zoom"
-      aria-label="Reset zoom"
-      title="Reset zoom (Ctrl+0)"
-      @click="store.zoomReset()"
-    >
-      {{ store.zoomPercent }}%
-    </button>
-    <button
-      class="nav star"
-      :class="{ active: store.isActiveTabPinned }"
-      :aria-label="store.isActiveTabPinned ? 'Unpin site' : 'Pin site'"
-      :title="store.isActiveTabPinned ? 'Unpin from workspace' : 'Pin to workspace'"
-      @click="store.toggleActiveTabPinned()"
-    >
-      {{ store.isActiveTabPinned ? '★' : '☆' }}
-    </button>
-    <button
-      class="nav notes-btn"
-      :class="{ active: store.showNotes }"
-      aria-label="Notes"
-      title="Notes (Ctrl+Shift+N)"
-      @click="store.toggleNotes()"
-    >
-      📝
-    </button>
-    <button
-      class="nav"
-      aria-label="Website roles settings"
-      title="Website roles"
-      @click="store.openSettings()"
-    >
-      ⚙
-    </button>
-    <FocusControl />
+
+    <div class="addr-wrap">
+      <div class="addr" :class="{ focused: editing }">
+        <svg
+          class="lock"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#5e8f6e"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <rect x="4.5" y="10.5" width="15" height="9.5" rx="2.5" />
+          <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+        </svg>
+        <input
+          ref="urlInput"
+          v-model="draft"
+          class="url"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="Search or enter address"
+          @focus="onFocus"
+          @blur="onBlur"
+          @keyup.enter="onEnter"
+        />
+        <button
+          v-if="store.zoomPercent !== 100"
+          class="zoom"
+          aria-label="Reset zoom"
+          title="Reset zoom (Ctrl+0)"
+          @mousedown.prevent
+          @click="store.zoomReset()"
+        >
+          {{ store.zoomPercent }}%
+        </button>
+        <span v-if="store.activeHasNote" class="note-dot" title="This site has notes" />
+      </div>
+    </div>
+
+    <div class="right-group">
+      <button
+        class="nav star"
+        :class="{ active: store.isActiveTabPinned }"
+        :title="store.isActiveTabPinned ? 'Unpin from workspace' : 'Pin to workspace'"
+        @click="store.toggleActiveTabPinned()"
+      >
+        {{ store.isActiveTabPinned ? '★' : '☆' }}
+      </button>
+      <FocusControl />
+      <button
+        class="nav"
+        aria-label="Website roles settings"
+        title="Website roles"
+        @click="store.openSettings()"
+      >
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L16 3H8l-.5 2.4a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 3 12a7 7 0 0 0 .1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L8 21h8l.5-2.4a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6A7 7 0 0 0 19 12z"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -128,11 +190,21 @@ function onEnter(): void {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 48px;
-  padding: 0 10px;
-  /* Transparent so the workspace-tinted chrome background shows through. */
+  gap: 12px;
+  height: 54px;
+  flex: 0 0 54px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--flow-line);
   background: transparent;
+}
+.nav-group {
+  display: flex;
+  gap: 2px;
+}
+.right-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .nav {
@@ -142,31 +214,19 @@ function onEnter(): void {
   display: grid;
   place-items: center;
   border: none;
-  border-radius: 6px;
+  border-radius: 9px;
   background: transparent;
-  color: var(--color-text);
-  font-size: 18px;
+  color: var(--flow-text-2);
   line-height: 1;
   cursor: default;
 }
 .nav:hover:not(:disabled) {
-  background: var(--color-background-mute);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--flow-text);
 }
 .nav:disabled {
   opacity: 0.3;
 }
-
-.zoom {
-  width: auto;
-  padding: 0 8px;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ev-c-text-3);
-}
-.zoom:hover {
-  color: var(--color-text);
-}
-
 .star {
   font-size: 16px;
 }
@@ -174,45 +234,60 @@ function onEnter(): void {
   color: var(--accent);
 }
 
-.url-wrap {
-  position: relative;
+/* Centered address pill */
+.addr-wrap {
   flex: 1;
+  display: flex;
+  justify-content: center;
   min-width: 0;
-  margin-left: 4px;
+}
+.addr {
+  width: 520px;
+  max-width: 100%;
+  height: 36px;
   display: flex;
   align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border-radius: 11px;
+  background: var(--flow-panel);
+  border: 1px solid var(--flow-line-2);
+}
+.addr.focused {
+  border-color: var(--accent-border);
+  background: var(--flow-panel-2);
+}
+.lock {
+  flex-shrink: 0;
 }
 .url {
-  width: 100%;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--color-background-mute);
-  color: var(--color-text);
-  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--flow-text);
+  font-size: 13.5px;
   outline: none;
 }
-.url:focus {
-  border-color: var(--accent, var(--ev-c-gray-1));
-  background: var(--color-background-soft);
+.url::placeholder {
+  color: var(--flow-text-3);
 }
-/* Non-interactive indicator that the current site has a saved note. Clicks pass
-   through to the address input; use the 📝 button or Ctrl+Shift+N to open notes. */
+.zoom {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--flow-text-3);
+  cursor: default;
+}
+.zoom:hover {
+  color: var(--flow-text);
+}
 .note-dot {
-  position: absolute;
-  right: 10px;
-  width: 8px;
-  height: 8px;
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--accent, #4f8cff);
-  pointer-events: none;
-}
-.notes-btn {
-  font-size: 14px;
-}
-.notes-btn.active {
-  background: var(--color-background-mute);
-  color: var(--accent);
+  background: var(--accent);
 }
 </style>

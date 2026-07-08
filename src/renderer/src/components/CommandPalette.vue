@@ -80,35 +80,40 @@ function run(index: number): void {
   justify-content: center;
   align-items: flex-start;
   padding-top: 14vh;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(6, 7, 10, 0.55);
   user-select: none;
 }
 
 .palette {
-  width: 620px;
+  width: 640px;
   max-width: 92vw;
-  background: var(--color-background-soft);
-  border: 1px solid var(--ev-c-gray-3);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  background: rgba(17, 18, 25, 0.92);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid var(--flow-line-2);
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
 
 .query {
   width: 100%;
-  height: 52px;
+  height: 54px;
   padding: 0 20px;
   border: none;
   background: transparent;
-  color: var(--color-text);
+  color: var(--flow-text);
   font-size: 16px;
   outline: none;
+}
+.query::placeholder {
+  color: var(--flow-text-3);
 }
 
 .results {
   max-height: 52vh;
   overflow-y: auto;
-  border-top: 1px solid var(--ev-c-gray-3);
+  border-top: 1px solid var(--flow-line);
   padding: 6px;
 }
 .result {
@@ -116,11 +121,13 @@ function run(index: number): void {
   align-items: center;
   gap: 12px;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: default;
 }
 .result.active {
-  background: color-mix(in srgb, var(--accent, #4f8cff) 20%, transparent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  padding: 8px 11px;
 }
 .icon {
   width: 20px;
@@ -135,14 +142,17 @@ function run(index: number): void {
 }
 .title {
   font-size: 13px;
-  color: var(--color-text);
+  color: var(--flow-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.result.active .title {
+  color: #eceefb;
+}
 .subtitle {
   font-size: 11px;
-  color: var(--ev-c-text-3);
+  color: var(--flow-text-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -151,8 +161,8 @@ function run(index: number): void {
 .empty {
   padding: 20px;
   font-size: 13px;
-  color: var(--ev-c-text-3);
+  color: var(--flow-text-3);
   text-align: center;
-  border-top: 1px solid var(--ev-c-gray-3);
+  border-top: 1px solid var(--flow-line);
 }
 </style>
